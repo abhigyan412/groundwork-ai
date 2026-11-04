@@ -58,7 +58,7 @@ The React frontend adds about half a day, which uses up the slack; the cut list 
 
 - [ ] Product name (working name: Groundwork)
 - [ ] Answer composition: citation format and LLM guardrails
-- [ ] LLM provider (embeddings decided: local `bge-small`, 384-dim)
+- [x] LLM provider: Anthropic Claude, `claude-sonnet-5-5` (configurable; `fake` until task 04). Embeddings: local `bge-small`, 384-dim
 - [ ] Confirm the [Proposed] items in `docs/` before building
 
 ---

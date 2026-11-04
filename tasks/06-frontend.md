@@ -37,6 +37,7 @@ A polished React app: landing page, auth, dashboard (documents, assistant, usage
 - [ ] nginx `web` service in Docker Compose serving the build and proxying the API
 - [ ] Framing headers: `/a/*` frameable, everything else not
 - [ ] `demo/university.html` and `demo/company.html` embedding the widget
+- [ ] JS embed (last item): `embed.js` adds a floating chat button that opens the widget iframe; snippet shown on the Assistant page as a secondary option under the iframe code
 
 ### Quality floor
 - [ ] Every data view has loading, empty and error states (`docs/frontend.md` §7)

@@ -86,7 +86,10 @@ Response 200:
   "outcome": "answered | unanswered | needs_info | review",
   "references": [{ "file": "Scholarship_Rules.pdf", "page": 4 }],
   "route": "decision",
-  "verdicts": [{ "id": "d1", "value": "TRUE", "confidence": 1.0, "source": "Scholarship_Rules.pdf p4" }],
+  "verdicts": [{ "id": "d1", "kind": "fact", "label": "GPA at least 3.5", "rule": "Applicants must hold…",
+                 "value": "TRUE", "confidence": 1.0, "user_value": 3.6, "missing_fact": null,
+                 "source": { "file": "Scholarship_Rules.pdf", "page": 4, "excerpt": "Applicants must hold…" },
+                 "reason": null }],
   "timings_ms": { "retrieve": 120, "classify": 8, "decisions": { "d1": 1, "d2": 1, "d3": 140 }, "compose": 900 }
 }
 ```

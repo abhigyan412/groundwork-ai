@@ -15,7 +15,7 @@ A multi-tenant AI Knowledge & Decision Assistant (take-home assignment). Organiz
 
 ## Non-negotiable rules
 
-- **The LLM is only used in `decompose()` and `compose()`.** Never use it to classify, route, make a decision, or combine results. Those belong to System 1 models or plain code.
+- **The LLM is only used in the decompose step (`decompose()`, `decompose_comparison()`, `extract_comparison_values()`) and `compose()`.** Never use it to classify, route, ground a rule, make a decision, compare, or combine results. Those belong to System 1 models or plain code.
 - **`org_id` always comes from a validated credential** (JWT or assistant token), never from the request body or query string.
 - **Every query on `documents`, `chunks` or `questions` filters by `org_id`.** No exceptions, including in scripts and tests.
 - **Admin routes accept only the JWT. Public routes accept only the assistant token.**

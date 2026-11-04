@@ -22,16 +22,16 @@ Self-written PDFs with deliberately clean, testable rules.
 |---|---|---|---|---|
 | 1 | Uni | What time is the hostel curfew? | Direct | Answer + Hostel_Policy page |
 | 2 | Uni | How do I apply for the merit scholarship? | Procedural | Ordered steps + page |
-| 3 | Uni | Can I hold the merit scholarship and a sports scholarship together? | Policy | NLI Boolean: FALSE |
-| 4 | Uni | I'm in 2nd year, GPA 3.6, 80% attendance, no other scholarship. Am I eligible for merit? | Multi-condition, multiple decisions | ALL TRUE → eligible |
-| 5 | Uni | I'm in 3rd year with 82% attendance and a sports scholarship. Am I eligible? | Multi-condition, missing fact | FALSE (other scholarship); GPA UNKNOWN noted |
-| 6 | Uni | Which hostel block is cheaper, A or B? | Comparison | Numeric Choice |
+| 3 | Uni | Can I hold the merit scholarship and a sports scholarship together? | Policy | Pattern → "It is permitted to hold the merit scholarship and a sports scholarship together." → contradiction on top-3 chunk → FALSE |
+| 4 | Uni | I'm in 2nd year, GPA 3.6, 80% attendance, no other scholarship. Am I eligible for merit? | Multi-condition, multiple decisions | 4 fact checks, all rule-grounded: `year >= 2`, `gpa >= 3.5`, `attendance_pct >= 75`, `has_other_scholarship == false` → ALL TRUE → eligible |
+| 5 | Uni | I'm in 3rd year with 82% attendance and a sports scholarship. Am I eligible? | Multi-condition, missing fact | `has_other_scholarship == false` FALSE; `gpa` UNKNOWN (missing) → ALL FALSE, outcome `answered`, answer notes GPA wasn't given |
+| 6 | Uni | Which hostel block is cheaper, A or B? | Comparison | `{options: [Block A, Block B], criterion: hostel fee, better: lower}` → values extracted and found in chunks → code picks the lower |
 | 7 | Uni | What's on the canteen menu this week? | Not in KB | Gate → unanswered |
 | 8 | Co | How many sick leaves do I get per year? | Direct | Answer + Leave_Policy page |
 | 9 | Co | How do I file a travel reimbursement claim? | Procedural | Ordered steps + page |
-| 10 | Co | I joined 8 months ago. Can I work from home 3 days a week? | Multi-condition | Probation TRUE, days FALSE → not allowed |
-| 11 | Co | Can unused casual leave be carried forward? | Policy | NLI Boolean per document |
-| 12 | Co | Is the hotel cap higher for metro or non-metro cities? | Comparison | Numeric Choice |
+| 10 | Co | I joined 8 months ago. Can I work from home 3 days a week? | Multi-condition | `tenure_months >= 6` TRUE; `wfh_days_per_week <= 2` FALSE; manager approval UNKNOWN (missing) → ALL FALSE → not allowed |
+| 11 | Co | Can unused casual leave be carried forward? | Policy | Pattern "Can X be Y?" → "Unused casual leave can be carried forward." → NLI on top 3 chunks → verdict per Leave_Policy text |
+| 12 | Co | Is the hotel cap higher for metro or non-metro cities? | Comparison | `{options: [metro, non-metro], criterion: hotel cap, better: higher}` → code picks metro |
 | 13 | Co | What is the employee stock option policy? | Not in KB | Gate → unanswered |
 | 14 | Co | What is the merit scholarship GPA requirement? | Isolation | Gate → unanswered (uni data not used) |
 
@@ -49,8 +49,13 @@ For each run, record: route taken, verdicts, outcome, references, and whether it
 ## Unit tests
 
 - [ ] Combiner: all ALL/ANY combinations of TRUE/FALSE/UNKNOWN
-- [ ] Validator: unretrieved chunk, threshold not in chunk text, unknown fact, bad op
-- [ ] Executors: numeric comparisons, missing fact → UNKNOWN, timeout → UNKNOWN
+- [ ] Validator: unretrieved chunk, value not in chunk text, fact type mismatch, op not allowed for type (e.g. `>=` on boolean)
+- [ ] Number normalization: "75%", "₹45,000", "3.5/4.0", "6-month"
+- [ ] Rule grounding: spec dropped when the cited chunk doesn't entail `rule` (stub NLI)
+- [ ] Policy patterns: each pattern in `docs/ai-design.md` §5 → expected hypothesis; non-matching question → decision path
+- [ ] Comparison: lower/higher pick, missing value, tie, unit mismatch, value not in chunk → dropped, no numbers → NLI fallback
+- [ ] Executors: number/boolean/string comparisons, missing fact → UNKNOWN, timeout → UNKNOWN
+- [ ] Outcome: overall UNKNOWN from missing facts → `needs_info`; decided result with missing facts → `answered`; model failure → `review`
 - [ ] Upload limits: non-PDF, > 10 MB, > 20 pages, 11th document
 - [ ] Empty question → 400
 
