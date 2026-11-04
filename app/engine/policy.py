@@ -6,7 +6,7 @@ import re
 from collections.abc import Callable
 
 from app.config import Settings
-from app.engine.excerpt import best_excerpt
+from app.engine.excerpt import anchor_sentence, best_excerpt
 from app.engine.executors import nli_verdict
 from app.engine.types import Source, Verdict
 from app.ml.nli import Nli
@@ -88,11 +88,16 @@ def policy_hypothesis(question: str) -> str | None:
 async def check_policy(
     hypothesis: str, chunks: list[RetrievedChunk], nli: Nli, settings: Settings
 ) -> tuple[Verdict, RetrievedChunk | None]:
-    """NLI of the hypothesis against each top chunk; the strongest decisive verdict wins."""
-    top = chunks[: settings.policy_chunks_checked]
-    results = await asyncio.to_thread(nli.predict, [(c.text, hypothesis) for c in top])
+    """NLI of the hypothesis against each top chunk's anchor sentence (the sentence closest in
+    wording to the hypothesis); the strongest decisive verdict wins."""
+    top = [
+        (c, a)
+        for c in chunks[: settings.policy_chunks_checked]
+        if (a := anchor_sentence(c.text, hypothesis)) is not None
+    ]
+    results = await asyncio.to_thread(nli.predict, [(a, hypothesis) for _, a in top])
     best: tuple[float, str, RetrievedChunk] | None = None
-    for chunk, r in zip(top, results, strict=True):
+    for (chunk, _anchor), r in zip(top, results, strict=True):
         value = nli_verdict(r.entailment, r.contradiction, settings.nli_verdict_threshold)
         if value == "UNKNOWN":
             continue

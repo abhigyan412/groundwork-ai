@@ -122,6 +122,16 @@ class _Run:
             answer_source=source,  # type: ignore[arg-type]
         )
 
+    def unanswered(self) -> AskResult:
+        return self.result(
+            answer=f"The documents for {self.org_name} don't cover this.",
+            outcome="unanswered",
+            references=[],
+            route=None,
+            verdicts=[],
+            source="none",
+        )
+
     async def answer_or_template(
         self, data: ComposeInput, *, references: list[Reference], route: Route
     ) -> AskResult:
@@ -235,7 +245,10 @@ class _Run:
         plan, report = await self._decompose(pchunks, refs)
 
         if plan is not None and not plan.decisions and not report.errors:
-            # The decomposer judged this not to be a rule-based decision: grounded answer.
+            # The decomposer judged this not to be a rule-based decision, so the looser decision
+            # gate no longer applies: answer from the chunks only if they clear the strict gate.
+            if chunks[0].rerank_score < gate_threshold(self.s, None):
+                return self.unanswered()
             return await self.grounded(chunks, "decision")
         if not report.valid:
             # Decomposition failed even after the retry: grounded answer, flagged for review.
@@ -358,22 +371,17 @@ async def answer_question(
         return r
 
     classification, retrieval = await asyncio.gather(classify(), find())
-    route: Route = (
-        classification.label  # type: ignore[assignment]
-        if classification.probability >= s.router_confidence_threshold
-        else "decision"
-    )
+    confident = classification.probability >= s.router_confidence_threshold
+    route: Route = classification.label if confident else "decision"  # type: ignore[assignment]
 
-    if not passes_gate(retrieval, s, route):
+    # Safeguard: the looser decision gate is earned only by a *confident* decision label. A
+    # low-confidence question still takes the decision path (safest for multi-condition
+    # questions) but must clear the strict gate, so a misrouted short question can't slip
+    # through on the looser threshold (Q17 in the task 04 eval).
+    gate_route = classification.label if confident else None
+    if not passes_gate(retrieval, s, gate_route):
         run.timings["total"] = _ms(start)
-        return run.result(
-            answer=f"The documents for {org_name} don't cover this.",
-            outcome="unanswered",
-            references=[],
-            route=None,
-            verdicts=[],
-            source="none",
-        )
+        return run.unanswered()
 
     chunks = retrieval.chunks
     if route in ("direct", "procedural"):

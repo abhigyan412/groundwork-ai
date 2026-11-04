@@ -279,9 +279,31 @@ async def test_no_valid_specs_falls_back_to_grounded_review(app, uni):
 
 
 async def test_zero_decisions_gives_grounded_answer(app, uni):
-    q = "Tell me about the merit scholarship rules"
+    # Fake reranker: 3 of 4 content words match the overview page -> +2.5, clears the strict gate.
+    q = "Merit scholarship overview, please."
     r = await ask(app, uni, q, route="decision", llm=FakeLLMClient())
     assert r.route == "decision" and r.outcome == "answered" and r.verdicts == []
+
+
+async def test_zero_decisions_on_weak_retrieval_is_unanswered(app, uni):
+    """Safeguard 2: no conditions means it isn't a decision question, so the looser decision
+    gate no longer applies; retrieval that only cleared the looser gate gets no answer
+    (Q17 in the task 04 eval: parental leave answered with the sick-leave rule)."""
+    q = "hostel gym opening schedule"  # fake reranker: 1 of 4 words -> -2.5, between 0 and -5
+    llm = FakeLLMClient()
+    r = await ask(app, uni, q, route="decision", llm=llm)
+    assert r.outcome == "unanswered" and r.route is None and r.references == []
+    assert [m for m, _ in llm.calls] == ["decompose"]  # never composed an answer
+
+
+async def test_low_confidence_question_must_clear_the_strict_gate(app, uni):
+    """Safeguard 1: a low-confidence label goes down the decision path but is gated strictly."""
+    q = "hostel gym opening schedule"  # -2.5: passes the decision gate, fails the strict one
+    llm = FakeLLMClient()
+    r = await ask(app, uni, q, route="decision", llm=llm, probability=0.4)
+    assert r.outcome == "unanswered" and llm.calls == []
+    confident = await ask(app, uni, q, route="decision", llm=FakeLLMClient(), probability=0.95)
+    assert confident.timings_ms.get("decompose") is not None  # passed the gate, reached decompose
 
 
 async def test_low_classifier_confidence_routes_to_decision(app, uni):

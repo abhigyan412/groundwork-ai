@@ -8,7 +8,7 @@ import asyncio
 from dataclasses import dataclass
 
 from app.config import Settings
-from app.engine.excerpt import best_excerpt
+from app.engine.excerpt import anchor_sentence, best_excerpt
 from app.engine.normalize import format_number, value_in_text
 from app.engine.spec import ComparisonPlan, ExtractedValue
 from app.engine.types import Source, Verdict, VerdictValue
@@ -131,7 +131,8 @@ async def decide_by_nli(
     hypotheses = {o: f"{o} offers a {plan.better} {plan.criterion}." for o in plan.options}
     for option in plan.options:
         for chunk in chunks_by_option.get(option, []):
-            pairs.append((chunk.text, hypotheses[option]))
+            premise = anchor_sentence(chunk.text, hypotheses[option]) or chunk.text
+            pairs.append((premise, hypotheses[option]))
             owners.append((option, chunk))
     results = await asyncio.to_thread(nli.predict, pairs) if pairs else []
 

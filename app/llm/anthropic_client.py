@@ -24,7 +24,7 @@ from app.engine.spec import (
     DecisionPlan,
     ExtractedValues,
 )
-from app.llm import prompts
+from app.llm import prompts, usage
 from app.llm.base import ComposeInput, LLMOutputError, LLMUnavailableError, PromptChunk
 
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
@@ -49,6 +49,7 @@ class AnthropicLLM:
     async def _call(
         self,
         *,
+        method: str,
         system: str,
         messages: list[dict[str, Any]],
         effort: str,
@@ -78,6 +79,18 @@ class AnthropicLLM:
         except anthropic.AnthropicError as exc:  # e.g. missing credentials
             raise LLMUnavailableError(f"LLM client error: {exc}") from exc
 
+        u = response.usage
+        usage.record(
+            usage.LLMCall(
+                method=method,
+                model=response.model,
+                input_tokens=u.input_tokens,
+                output_tokens=u.output_tokens,
+                cache_read_input_tokens=u.cache_read_input_tokens or 0,
+                cache_creation_input_tokens=u.cache_creation_input_tokens or 0,
+                stop_reason=response.stop_reason,
+            )
+        )
         if response.stop_reason == "refusal":
             raise LLMUnavailableError("The LLM declined the request")
         if response.stop_reason == "max_tokens":
@@ -88,9 +101,16 @@ class AnthropicLLM:
         return text
 
     async def _structured(
-        self, model: type[T], *, system: str, messages: list[dict[str, Any]], schema: dict[str, Any]
+        self,
+        model: type[T],
+        *,
+        method: str,
+        system: str,
+        messages: list[dict[str, Any]],
+        schema: dict[str, Any],
     ) -> T:
         text = await self._call(
+            method=method,
             system=system,
             messages=messages,
             effort=self._settings.llm_effort_decompose,
@@ -118,6 +138,7 @@ class AnthropicLLM:
             ]
         return await self._structured(
             DecisionPlan,
+            method="decompose",
             system=prompts.DECOMPOSE_SYSTEM,
             messages=messages,
             schema=DECISION_PLAN_SCHEMA,
@@ -128,6 +149,7 @@ class AnthropicLLM:
     ) -> ComparisonPlan:
         return await self._structured(
             ComparisonPlan,
+            method="decompose_comparison",
             system=prompts.COMPARISON_SYSTEM,
             messages=[{"role": "user", "content": prompts.comparison_user(question, chunks)}],
             schema=COMPARISON_PLAN_SCHEMA,
@@ -139,6 +161,7 @@ class AnthropicLLM:
         content = prompts.extract_user(plan.options, plan.criterion, chunks_by_option)
         return await self._structured(
             ExtractedValues,
+            method="extract_comparison_values",
             system=prompts.EXTRACT_SYSTEM,
             messages=[{"role": "user", "content": content}],
             schema=EXTRACTED_VALUES_SCHEMA,
@@ -146,6 +169,7 @@ class AnthropicLLM:
 
     async def compose(self, data: ComposeInput) -> str:
         return await self._call(
+            method="compose",
             system=prompts.COMPOSE_SYSTEM,
             messages=[{"role": "user", "content": prompts.compose_user(data)}],
             effort=self._settings.llm_effort_compose,

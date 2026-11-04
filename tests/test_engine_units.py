@@ -508,3 +508,39 @@ async def test_fake_nli_heuristic():
         ],
     )
     assert e.entailment > 0.9 and c.contradiction > 0.9 and n.neutral > 0.8
+
+
+# --- Anchor sentences (rule check premise) ------------------------------------------------------
+
+
+def test_anchor_sentence_is_chosen_by_wording_and_skips_headings():
+    from app.engine.excerpt import anchor_sentence
+
+    chunk_text = (
+        "3. Other scholarships\n"
+        "3.1 No combination\n"
+        "Applicants must not hold another institutional scholarship.\n"
+        "If a student accepts another institutional scholarship after receiving the merit "
+        "scholarship, the merit scholarship is withdrawn from the following semester."
+    )
+    # The opposite rule must be checked against the sentence it resembles, not the withdrawal
+    # clause the NLI model reads as entailing it.
+    assert anchor_sentence(
+        chunk_text, "Applicants may hold another institutional scholarship."
+    ) == ("Applicants must not hold another institutional scholarship.")
+    assert anchor_sentence("3.3 Withdrawal\nFees", "anything") is None
+
+
+def test_classifier_retrains_when_c_changes(tmp_path):
+    import joblib
+
+    from app.ml.classifier import load_or_train, model_key
+    from app.ml.embedder import FakeEmbedder
+
+    examples = get_settings().classifier_examples_path
+    path = tmp_path / "clf.joblib"
+    emb = FakeEmbedder(384)
+    load_or_train(emb, model_key("fake", "m", 4.0), path, examples, 4.0)
+    assert joblib.load(path)["model"].C == 4.0
+    load_or_train(emb, model_key("fake", "m", 64.0), path, examples, 64.0)
+    assert joblib.load(path)["model"].C == 64.0  # stale C=4 model was not reused

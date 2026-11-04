@@ -32,16 +32,17 @@ def main() -> None:
     x = np.stack([embedder.embed_query(q) for q in questions])
 
     folds = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
-    predicted = cross_val_predict(LogisticRegression(max_iter=2000, C=4.0), x, labels, cv=folds)
+    estimator = LogisticRegression(max_iter=5000, C=s.classifier_c)
+    predicted = cross_val_predict(estimator, x, labels, cv=folds)
     correct = sum(p == t for p, t in zip(predicted, labels, strict=True))
     print(f"{len(questions)} examples, 5-fold CV accuracy {correct / len(labels):.0%}")
     mistakes = Counter((t, p) for p, t in zip(predicted, labels, strict=True) if p != t)
     for (true, pred), n in mistakes.most_common():
         print(f"  {true} → {pred}: {n}")
 
-    model = train(embedder, questions, labels)
+    model = train(embedder, questions, labels, c=s.classifier_c)
     s.classifier_path.parent.mkdir(parents=True, exist_ok=True)
-    key = model_key(s.model_backend, s.embedding_model)
+    key = model_key(s.model_backend, s.embedding_model, s.classifier_c)
     joblib.dump({"embedding_model": key, "model": model}, s.classifier_path)
     print(f"saved {s.classifier_path}")
 

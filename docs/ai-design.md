@@ -34,12 +34,15 @@ Tuned with `scripts/eval_retrieval.py` on the 18 questions in `sample_data/quest
 - the lowest in-KB score is +1.98 for non-decision routes and −1.26 for decision questions
 - the highest not-in-KB score is −1.57
 
-Known risk: a short not-in-KB question that the classifier misroutes to "decision" gets the looser gate (Q17 would). Task 04 re-runs the eval with predicted routes.
+Safeguards, added after the task 04 eval, where a misrouted Q17 got the looser gate and was answered with the sick-leave rule:
+- The looser decision gate applies only when the classifier *confidently* predicts `decision`. A low-confidence question still takes the decision path, but must clear the strict gate.
+- If the decomposer returns no decisions, the question isn't a decision question after all. It gets a grounded answer only if the top chunk clears the strict gate; otherwise it is `unanswered`.
 
 ## 3. Question classifier (System 1) [Proposed]
 
 - Labels: `direct`, `procedural`, `policy`, `decision`, `comparison`.
-- Logistic regression on embeddings of 60–80 hand-labeled questions, saved as `.joblib`.
+- Logistic regression (C = 64) on bge embeddings of 75 hand-labelled questions (`sample_data/classifier_examples.json`), saved as `.joblib` and retrained automatically if the embedder or C changes.
+- C = 64, not 4: at C = 4 the top label was right for all 11 in-KB eval questions, but its probabilities were flat, and 6 of 11 fell under the 0.6 router threshold. At C = 64, 5-fold CV accuracy is 88% (vs 79%), held-out top-1 is 11/11, and the lowest in-KB confidence is 0.80.
 - Runs in parallel with retrieval.
 
 ## 4. Router [Confirmed]
@@ -54,8 +57,8 @@ Known risk: a short not-in-KB question that the classifier misroutes to "decisio
 | Not in knowledge base | Stopped at the gate | Gate |
 
 Safety rules [Proposed]:
-- Classifier top probability < 0.6 → decision path.
-- The decomposer may return zero decisions → falls through to a grounded answer.
+- Classifier top probability < 0.6 → decision path, gated with the strict threshold (§2).
+- The decomposer may return zero decisions → grounded answer if the strict gate passes, else unanswered.
 
 ## 5. Policy path [Confirmed] (ADR 0010)
 
@@ -128,7 +131,21 @@ Rules are extracted **at question time** from retrieved chunks. Every decision s
    - number values appear in the cited chunk's text after normalization
    - string values appear in the cited chunk's text (case-insensitive)
    - every `fact` referenced by a check is either in `user_facts` with a matching type, or absent (→ UNKNOWN at execution)
-3. **Rule grounding (System 1 NLI):** for every `fact` check, the cited chunk must entail `rule` with probability ≥ 0.7 (`rule_grounding_threshold`), or the spec is dropped. NLI verifies the rule exists, and code decides whether the user meets it. For `nli` checks, the check itself is the grounding: an entailment or contradiction of `hypothesis` ≥ 0.7 decides it, and anything else is UNKNOWN.
+3. **Rule grounding (System 1 NLI):** for every `fact` check, the cited chunk's **anchor sentence** must entail `rule` with probability ≥ 0.7 (`rule_grounding_threshold`), or the spec is dropped. The anchor is the sentence whose wording is closest to the rule (Jaccard overlap of content words; headings under 4 words are skipped). NLI verifies the rule exists, and code decides whether the user meets it. For `nli` checks, the check itself is the grounding: an entailment or contradiction of `hypothesis` by its anchor sentence ≥ 0.7 decides it, and anything else is UNKNOWN. The policy path and the comparison NLI fallback use anchor sentences the same way.
+
+   Why an anchor sentence, from the task 04 eval with the real DeBERTa model:
+
+   | Premise | Valid rules accepted | Bad rules rejected |
+   |---|---|---|
+   | Whole chunk (first version) | 3/10 | 10/11 |
+   | Highest score over all sentences | 10/10 | 10/11 |
+   | Anchor sentence (closest wording) | 9/10 | 11/11 |
+
+   - **Whole chunk:** valid, verbatim rules scored 0.001–0.13 against multi-topic chunks, against 0.98–0.99 for their own sentence.
+   - **Highest score over all sentences:** this let the withdrawal clause ("If a student accepts another institutional scholarship…") confirm the opposite rule "Applicants may hold another institutional scholarship" (0.995). Its anchor, "Applicants must not hold…", contradicts it (0.997).
+   - **Anchor sentence:** the one miss is a loose paraphrase. The decompose prompt asks for the rule as written, and a miss gets one retry.
+   - These 21 cases are tests in `tests/test_rule_check_real.py` (run with `RUN_MODEL_TESTS=1`).
+   - **Limit:** grounding proves the rule's text is in the document, not that the decomposer turned it into the right check (e.g. `has_other_scholarship == false`). The eval compares Claude's plans with reference plans for that.
 4. **One retry** with the validation errors fed back to the LLM (schema and semantic errors; grounding failures are reported as "rule not supported by the cited chunk").
 5. **Fallback:** if no valid decisions remain after the retry, give a grounded answer without decisions, logged as `review`.
 
@@ -184,7 +201,7 @@ class LLMClient(Protocol):
 
 - **Provider:** set by `LLM_PROVIDER` in `.env`; `fake` is the default.
 - **Anthropic implementation** (`app/llm/anthropic_client.py`):
-  - Default model `claude-opus-5-5`, Anthropic's recommended default, overridable with `LLM_MODEL`. Thinking is adaptive (it can't be disabled on this model), and effort is set explicitly: `medium` for the decompose step, `low` for `compose()`.
+  - Default model `claude-sonnet-5-5`, chosen for latency in the chat widget; `claude-opus-5-5` is selectable with `LLM_MODEL`. Thinking is adaptive on both (neither accepts `{type: "disabled"}`), and effort is set explicitly: `medium` for the decompose step, `low` for `compose()`.
   - The decompose step uses structured outputs (`output_config.format` with a hand-written JSON schema in `app/engine/spec.py`; user facts are an array of `{name, type, value}`, because every object needs `additionalProperties: false`). The output is then validated with Pydantic.
   - Server-side refusal fallback: `fallbacks: "default"`, beta `server-side-fallback-2026-07-01`.
   - The SDK retries 408/409/429/5xx and connection errors. Anything left over, plus refusals, truncated or empty output and missing credentials, becomes `LLMUnavailableError`.

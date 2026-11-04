@@ -13,7 +13,7 @@ import time
 from collections.abc import Callable
 
 from app.config import Settings
-from app.engine.excerpt import best_excerpt
+from app.engine.excerpt import anchor_sentence, best_excerpt
 from app.engine.spec import FactCheck, NliCheck, UserFact
 from app.engine.types import Source, Verdict, VerdictValue
 from app.engine.validate import ValidSpec
@@ -59,7 +59,9 @@ def _run_fact(spec: FactCheck, facts: dict[str, UserFact]) -> tuple[VerdictValue
 
 
 def _run_nli(spec: NliCheck, nli: Nli, chunk_text: str, threshold: float):
-    (r,) = nli.predict([(chunk_text, spec.hypothesis)])
+    # Premise: the sentence closest in wording to the hypothesis (see app/engine/excerpt.py).
+    premise = anchor_sentence(chunk_text, spec.hypothesis) or chunk_text
+    (r,) = nli.predict([(premise, spec.hypothesis)])
     value = nli_verdict(r.entailment, r.contradiction, threshold)
     confidence = {"TRUE": r.entailment, "FALSE": r.contradiction}.get(value, 0.0)
     return value, confidence

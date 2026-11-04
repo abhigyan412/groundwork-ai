@@ -54,21 +54,23 @@ def load_examples(path: Path) -> tuple[list[str], list[str]]:
     return questions, labels
 
 
-def train(embedder: Embedder, questions: list[str], labels: list[str]) -> LogisticRegression:
+def train(
+    embedder: Embedder, questions: list[str], labels: list[str], c: float
+) -> LogisticRegression:
     # Embed as queries: that's how questions are embedded at prediction time.
     x = np.stack([embedder.embed_query(q) for q in questions])
-    model = LogisticRegression(max_iter=2000, C=4.0)
+    model = LogisticRegression(max_iter=5000, C=c)
     model.fit(x, labels)
     return model
 
 
-def model_key(backend: str, embedding_model: str) -> str:
-    """Identifies the embedder a saved classifier was trained with."""
-    return f"{backend}:{embedding_model}"
+def model_key(backend: str, embedding_model: str, c: float) -> str:
+    """Identifies how a saved classifier was trained (embedder and C), so a stale one retrains."""
+    return f"{backend}:{embedding_model}:C={c:g}"
 
 
 def load_or_train(
-    embedder: Embedder, embedding_model: str, model_path: Path, examples_path: Path
+    embedder: Embedder, embedding_model: str, model_path: Path, examples_path: Path, c: float
 ) -> QuestionClassifier:
     try:
         bundle = joblib.load(model_path)
@@ -77,7 +79,7 @@ def load_or_train(
         log.info("classifier was trained with %s; retraining", bundle.get("embedding_model"))
     except FileNotFoundError:
         log.info("no classifier at %s; training from %s", model_path, examples_path)
-    model = train(embedder, *load_examples(examples_path))
+    model = train(embedder, *load_examples(examples_path), c=c)
     try:
         model_path.parent.mkdir(parents=True, exist_ok=True)
         joblib.dump({"embedding_model": embedding_model, "model": model}, model_path)

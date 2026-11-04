@@ -47,9 +47,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.classifier = await asyncio.to_thread(
         load_or_train,
         app.state.embedder,
-        model_key(settings.model_backend, settings.embedding_model),
+        model_key(settings.model_backend, settings.embedding_model, settings.classifier_c),
         settings.classifier_path,
         settings.classifier_examples_path,
+        settings.classifier_c,
     )
     app.state.llm = load_llm(settings)
     app.state.engine = EngineDeps(

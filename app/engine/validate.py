@@ -2,7 +2,8 @@
 
 1. Schema: Pydantic (DecisionPlan) — done by the caller when parsing.
 2. Semantic checks (code): cited chunk retrieved, value present in it, fact types and ops agree.
-3. Rule grounding (System 1 NLI): the cited chunk must entail each fact check's `rule`.
+3. Rule grounding (System 1 NLI): the cited chunk's anchor sentence (closest wording) must
+   entail each fact check's `rule`.
 
 Invalid specs are dropped and their errors returned, so the caller can retry once with them.
 """
@@ -10,6 +11,7 @@ Invalid specs are dropped and their errors returned, so the caller can retry onc
 import asyncio
 from dataclasses import dataclass, field
 
+from app.engine.excerpt import anchor_sentence
 from app.engine.normalize import string_in_text, value_in_text
 from app.engine.spec import EQUALITY_OPS, DecisionPlan, FactCheck, NliCheck
 from app.ml.nli import Nli
@@ -20,7 +22,8 @@ from app.retrieval.search import RetrievedChunk
 class ValidSpec:
     spec: FactCheck | NliCheck
     chunk: RetrievedChunk
-    grounding: float | None = None  # entailment probability of `rule` (fact checks)
+    grounding: float | None = None  # entailment of `rule` by the anchor (fact checks)
+    anchor: str | None = None  # the sentence the rule was checked against
 
 
 @dataclass
@@ -97,23 +100,36 @@ def semantic_check(plan: DecisionPlan, chunks: dict[str, RetrievedChunk]) -> Val
 
 
 async def ground_rules(report: ValidationReport, nli: Nli, threshold: float) -> ValidationReport:
-    """Drop fact checks whose cited chunk doesn't entail their `rule` (System 1 NLI)."""
+    """Drop fact checks whose rule the cited chunk doesn't state (System 1 NLI).
+
+    The rule is checked against one *anchor sentence*: the sentence of the cited chunk whose
+    wording is closest to the rule. Checking against the whole chunk fails on valid rules
+    (entailment 0.001-0.13 on multi-topic chunks, vs 0.98-0.99 on the sentence), and taking the
+    best score over all sentences lets an unrelated sentence confirm an opposite rule. See
+    docs/ai-design.md §8.
+    """
     fact_specs = [v for v in report.valid if isinstance(v.spec, FactCheck)]
     if not fact_specs:
         return report
-    results = await asyncio.to_thread(
-        nli.predict, [(v.chunk.text, v.spec.rule) for v in fact_specs]
-    )
-    kept: list[ValidSpec] = [v for v in report.valid if isinstance(v.spec, NliCheck)]
     errors = list(report.errors)
-    for v, r in zip(fact_specs, results, strict=True):
+    anchored: list[ValidSpec] = []
+    for v in fact_specs:
+        v.anchor = anchor_sentence(v.chunk.text, v.spec.rule)
+        if v.anchor is None:
+            errors.append(f"{v.spec.id}: the cited chunk {v.spec.source_chunk} has no sentences")
+        else:
+            anchored.append(v)
+    results = await asyncio.to_thread(nli.predict, [(v.anchor, v.spec.rule) for v in anchored])
+    kept: list[ValidSpec] = [v for v in report.valid if isinstance(v.spec, NliCheck)]
+    for v, r in zip(anchored, results, strict=True):
         v.grounding = r.entailment
         if r.entailment >= threshold:
             kept.append(v)
         else:
             errors.append(
-                f"{v.spec.id}: rule not supported by the cited chunk {v.spec.source_chunk} "
-                f"(state the rule as the document writes it, and cite the chunk that says it)"
+                f"{v.spec.id}: rule not supported by the cited chunk {v.spec.source_chunk}; "
+                f'its closest sentence is "{v.anchor}" (state the rule as the document '
+                f"writes it, and cite the chunk that says it)"
             )
     order = {id(v): i for i, v in enumerate(report.valid)}
     kept.sort(key=lambda v: order[id(v)])

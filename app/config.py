@@ -64,6 +64,10 @@ class Settings(BaseSettings):
 
     # --- Question classifier (docs/ai-design.md §3) ---
     classifier_examples_path: Path = Path("sample_data/classifier_examples.json")
+    # Logistic regression inverse regularization. C=4 gave flat probabilities (6/11 in-KB eval
+    # questions under the 0.6 router threshold despite a correct top label); C=64: CV accuracy
+    # 79% -> 88%, held-out top-1 11/11, lowest in-KB confidence 0.80 (task 04 eval review).
+    classifier_c: float = 64.0
 
     # --- Decision engine (docs/ai-design.md §5-14) ---
     nli_verdict_threshold: float = 0.7  # entail/contradict probability for a decisive NLI verdict
@@ -80,7 +84,7 @@ class Settings(BaseSettings):
     # --- LLM (only the decompose step and compose(); CLAUDE.md) ---
     llm_provider: Literal["fake", "anthropic"] = "fake"
     llm_api_key: SecretStr = SecretStr("")  # empty: the SDK falls back to ANTHROPIC_API_KEY
-    llm_model: str = "claude-opus-5-5"
+    llm_model: str = "claude-sonnet-5-5"  # latency matters in the chat widget; Opus via LLM_MODEL
     llm_effort_decompose: Literal["low", "medium", "high", "xhigh", "max"] = "medium"
     llm_effort_compose: Literal["low", "medium", "high", "xhigh", "max"] = "low"
     llm_max_tokens: int = 16000  # includes adaptive thinking; non-streaming requests

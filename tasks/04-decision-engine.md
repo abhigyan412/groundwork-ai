@@ -9,10 +9,10 @@ Route each question; run structured decisions with System 1 models in parallel; 
 
 ### Classifier and router
 - [x] Label 60–80 example questions (`sample_data/classifier_examples.json`)
-- [ ] `scripts/train_classifier.py` → `.joblib`
+- [x] `scripts/train_classifier.py` → `.joblib` (C = 64; also auto-trained at startup)
 - [x] Router with low-confidence fallback to decision path
 - [x] Apply the per-route groundedness gate (`passes_gate`) after `gather(classify, retrieve)`
-- [ ] Re-run `scripts/eval_retrieval.py` with the classifier's *predicted* routes; confirm near misses (Q15–18) aren't misrouted to decision (Q17 would leak)
+- [x] Re-run the eval with the classifier's *predicted* routes; confirm near misses (Q15–18) aren't misrouted to decision (Q17 would leak)
 
 ### LLM client
 - [x] `LLMClient` protocol (`decompose`, `decompose_comparison`, `extract_comparison_values`, `compose`), Anthropic implementation
@@ -46,6 +46,11 @@ Route each question; run structured decisions with System 1 models in parallel; 
 Unit tests for combiner, validator, normalization, policy patterns and comparison pass; test questions 3, 4, 5, 6, 10, 11 and 12 produce the expected verdicts.
 
 ## Status
-- Built and verified with fake models and a scripted LLM: 214 tests pass, including `tests/test_pipeline.py` (test questions 4, 5 and 10 end to end, every path, all LLM-failure fallbacks) and `tests/test_engine_units.py` (combiner over all 27 three-value combinations per rule, validator, normalization, policy patterns, comparison, executor timeout).
-- **Still open (real models):** `scripts/eval_engine.py` runs the 18 questions through the pipeline with the real classifier, NLI and rule grounding (and Claude once `LLM_PROVIDER=anthropic`). It couldn't run yet because the dev machine ran out of memory loading the models. It also covers the two open items above: training the classifier with real embeddings, and the predicted-route check for Q15–18.
-- LLM: `claude-opus-5-5` via `app/llm/anthropic_client.py`. It has not been called yet (no API key); `LLM_PROVIDER=fake` until then.
+- Eval review fixes, all approved:
+  - rule check against an anchor sentence (in place of the whole chunk)
+  - classifier C = 4 → 64
+  - two gate safeguards
+  See `docs/ai-design.md` §2, §3 and §8.
+- With reference plans, `scripts/eval_engine.py` passes **18/18** (it was 8/18 before the fixes) with the real classifier, NLI, reranker and embeddings. This covers the predicted-route check for Q15–18: all are refused.
+- **Tests:** 227 pass offline, plus 21 opt-in real-NLI rule-check cases (`RUN_MODEL_TESTS=1`).
+- **Next:** end-to-end runs with Claude (`claude-sonnet-5-5`).
