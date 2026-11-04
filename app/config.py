@@ -13,6 +13,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PRODUCT_NAME = "Groundwork"  # working name, see plan.md open decisions
 
+# Used when LLM_MODEL is empty. claude-sonnet-5-5: latency matters in the chat widget (Opus via
+# LLM_MODEL). gemini-3.6-flash: the stable Flash model (gemini-3.8-flash is newer, marked "New").
+DEFAULT_LLM_MODELS = {"anthropic": "claude-sonnet-5-5", "gemini": "gemini-3.6-flash", "fake": ""}
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
@@ -82,14 +86,24 @@ class Settings(BaseSettings):
     excerpt_max_chars: int = 240
 
     # --- LLM (only the decompose step and compose(); CLAUDE.md) ---
-    llm_provider: Literal["fake", "anthropic"] = "fake"
-    llm_api_key: SecretStr = SecretStr("")  # empty: the SDK falls back to ANTHROPIC_API_KEY
-    llm_model: str = "claude-sonnet-5-5"  # latency matters in the chat widget; Opus via LLM_MODEL
+    # gemini: the demo default (free tier). anthropic: Claude. fake: no network (tests, offline).
+    llm_provider: Literal["gemini", "anthropic", "fake"] = "gemini"
+    llm_api_key: SecretStr = SecretStr("")  # empty: the provider SDK's own env var is used
+    llm_model: str = ""  # empty: DEFAULT_LLM_MODELS[llm_provider]
+    # Thinking depth per call. Anthropic: `effort`. Gemini 3.x: `thinking_level` (low/medium/high).
     llm_effort_decompose: Literal["low", "medium", "high", "xhigh", "max"] = "medium"
     llm_effort_compose: Literal["low", "medium", "high", "xhigh", "max"] = "low"
-    llm_max_tokens: int = 16000  # includes adaptive thinking; non-streaming requests
+    llm_max_tokens: int = 16000  # includes thinking tokens; non-streaming requests
     llm_timeout_seconds: float = 60.0
-    llm_max_retries: int = 2  # SDK retries 408/409/429/5xx and connection errors
+    llm_max_retries: int = 2  # Anthropic SDK retries 408/409/429/5xx and connection errors
+    # Our own retry with backoff on 429 / 5xx (Gemini free tier: a few requests per minute).
+    llm_rate_limit_retries: int = 4
+    llm_retry_base_seconds: float = 2.0
+    llm_retry_max_wait_seconds: float = 45.0  # total sleep across retries for one call
+
+    @property
+    def resolved_llm_model(self) -> str:
+        return self.llm_model or DEFAULT_LLM_MODELS.get(self.llm_provider, "")
 
     @field_validator("jwt_secret")
     @classmethod

@@ -18,6 +18,18 @@ curl localhost:8000/health
 
 API docs: http://localhost:8000/docs
 
+## LLM providers
+
+The LLM is used only to break questions into checkable conditions and to write the final answer; every decision is made by local models and code. Set `LLM_PROVIDER` in `.env`:
+
+| Provider | `LLM_PROVIDER` | Default model (`LLM_MODEL` empty) | Notes |
+|---|---|---|---|
+| Google Gemini | `gemini` (**demo default**) | `gemini-3.6-flash` | Free-tier key from Google AI Studio. Free tier allows ~5–10 requests/minute; 429s are retried with backoff. A decision question uses 2–3 LLM calls. |
+| Anthropic Claude | `anthropic` | `claude-sonnet-5-5` | `claude-opus-5-5` via `LLM_MODEL`. Requires API credits. |
+| None | `fake` | n/a | No network. No decisions; answers are extracted from the documents. Used by the tests. |
+
+Put the key in `LLM_API_KEY` (or the SDK's own `GEMINI_API_KEY` / `ANTHROPIC_API_KEY`). `.env` is git-ignored; never commit it.
+
 ## Develop and test
 
 ```bash

@@ -22,6 +22,7 @@ dependencies = [
     "scikit-learn>=1.5",
     "joblib>=1.4",
     "anthropic>=2.4",
+    "google-genai>=2.30",
 ]
 
 [project.optional-dependencies]

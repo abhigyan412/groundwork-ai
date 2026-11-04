@@ -199,7 +199,13 @@ class LLMClient(Protocol):
     async def compose(self, data: ComposeInput) -> str: ...
 ```
 
-- **Provider:** set by `LLM_PROVIDER` in `.env`; `fake` is the default.
+- **Providers:** set by `LLM_PROVIDER` in `.env`: `gemini` (the demo default; ADR 0011), `anthropic`, or `fake`. `LLM_MODEL` empty means the provider's default model. All implementations share the prompts (`app/llm/prompts.py`), the schemas and the Pydantic validation, and they map every failure to `LLMUnavailableError` / `LLMOutputError` the same way, so the pipeline doesn't know which provider it's using.
+- **Gemini implementation** (`app/llm/gemini_client.py`, official `google-genai` SDK):
+  - Default model `gemini-3.6-flash` (stable Flash; `gemini-3.8-flash` is newer and marked "New").
+  - Structured output via `response_mime_type="application/json"` + `response_json_schema`. Gemini's docs don't clearly cover `anyOf`, so the client sends a flattened copy of the same schemas: scalar unions become type arrays (`["number", "null"]`), and the fact | nli union becomes one object with `check` as an enum and the branch-specific fields nullable. Pydantic then validates against the strict models, so the contract is unchanged.
+  - Thinking: Gemini 3.x `thinking_level`, mapped from the effort settings (`medium` for decompose, `low` for compose).
+  - Rate limits: the free tier allows a few requests per minute (per project). A 429 or a 5xx is retried with exponential backoff (`app/llm/retry.py`: base 2 s, at most 4 retries, at most 45 s of waiting per call), using a `RetryInfo` delay if the API sends one. If the retries run out, the error is `LLMUnavailableError`, and the pipeline's usual fallbacks apply (template answer when verdicts exist; otherwise 503).
+  - Token usage: thinking tokens count as output; cached tokens are reported separately.
 - **Anthropic implementation** (`app/llm/anthropic_client.py`):
   - Default model `claude-sonnet-5-5`, chosen for latency in the chat widget; `claude-opus-5-5` is selectable with `LLM_MODEL`. Thinking is adaptive on both (neither accepts `{type: "disabled"}`), and effort is set explicitly: `medium` for the decompose step, `low` for `compose()`.
   - The decompose step uses structured outputs (`output_config.format` with a hand-written JSON schema in `app/engine/spec.py`; user facts are an array of `{name, type, value}`, because every object needs `additionalProperties: false`). The output is then validated with Pydantic.

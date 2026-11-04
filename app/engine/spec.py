@@ -155,3 +155,62 @@ EXTRACTED_VALUES_SCHEMA = _obj(
         }
     }
 )
+
+
+# --- Gemini variant: no anyOf ------------------------------------------------------------------
+# Gemini's structured output documents JSON Schema type arrays (["number", "null"]) but not
+# clearly anyOf, so the Gemini client sends a flattened form of the same schemas:
+# - anyOf of scalar types → one type array;
+# - anyOf of objects (the fact | nli decision union) → one object: shared properties as they are,
+#   branch-specific ones nullable (enums on them are dropped; Pydantic still checks them).
+# The response is validated with the same Pydantic models, so the contract doesn't loosen.
+
+
+def _as_types(schema: dict[str, Any]) -> list[str]:
+    t = schema.get("type")
+    return t if isinstance(t, list) else [t]
+
+
+def _nullable(schema: dict[str, Any]) -> dict[str, Any]:
+    out = {k: v for k, v in schema.items() if k != "enum"}
+    types = _as_types(schema)
+    out["type"] = [*types, "null"] if "null" not in types else types
+    return out
+
+
+def flatten_any_of(schema: Any) -> Any:
+    if isinstance(schema, list):
+        return [flatten_any_of(s) for s in schema]
+    if not isinstance(schema, dict):
+        return schema
+    if "anyOf" in schema:
+        branches = [flatten_any_of(b) for b in schema["anyOf"]]
+        if all(b.get("type") != "object" and set(b) <= {"type"} for b in branches):
+            types: list[str] = []
+            for b in branches:
+                types.extend(t for t in _as_types(b) if t not in types)
+            return {"type": types}
+        if all(b.get("type") == "object" for b in branches):
+            names: list[str] = []
+            for b in branches:
+                names.extend(n for n in b["properties"] if n not in names)
+            merged: dict[str, Any] = {}
+            for name in names:
+                found = [b["properties"][name] for b in branches if name in b["properties"]]
+                if len(found) == len(branches) and all(f == found[0] for f in found):
+                    merged[name] = found[0]
+                elif len(found) == len(branches) and all("enum" in f for f in found):
+                    merged[name] = {
+                        "type": "string",
+                        "enum": sorted({e for f in found for e in f["enum"]}),
+                    }
+                else:
+                    merged[name] = _nullable(found[0])
+            return {
+                "type": "object",
+                "properties": merged,
+                "required": names,
+                "additionalProperties": False,
+            }
+        raise ValueError("can't flatten a mixed anyOf")
+    return {k: flatten_any_of(v) for k, v in schema.items()}

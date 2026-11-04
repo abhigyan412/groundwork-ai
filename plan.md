@@ -58,7 +58,7 @@ The React frontend adds about half a day, which uses up the slack; the cut list 
 
 - [ ] Product name (working name: Groundwork)
 - [ ] Answer composition: citation format and LLM guardrails
-- [x] LLM provider: Anthropic Claude, `claude-sonnet-5-5` for latency in the chat widget; `claude-opus-5-5` selectable via `LLM_MODEL`. Embeddings: local `bge-small`, 384-dim
+- [x] LLM provider: **Gemini** (`gemini-3.6-flash`, free tier) is the demo default (ADR 0011); Anthropic Claude (`claude-sonnet-5-5`, Opus via `LLM_MODEL`) and `fake` are also supported. Embeddings: local `bge-small`, 384-dim
 - [ ] Confirm the [Proposed] items in `docs/` before building
 
 ---

@@ -25,6 +25,9 @@ os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 os.environ["JWT_SECRET"] = secrets.token_urlsafe(48)
 os.environ["ASSISTANT_TOKEN_KEY"] = Fernet.generate_key().decode()
 os.environ["LLM_PROVIDER"] = "fake"
+# Never let the developer's .env (real key, model) leak into tests: env vars beat .env values.
+os.environ["LLM_API_KEY"] = ""
+os.environ["LLM_MODEL"] = ""
 os.environ["MODEL_BACKEND"] = "fake"
 os.environ.setdefault("STORAGE_DIR", os.path.join(os.path.dirname(__file__), ".storage"))
 os.environ["CLASSIFIER_PATH"] = os.path.join(

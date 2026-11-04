@@ -62,7 +62,7 @@ class AnthropicLLM:
             output_config["format"] = {"type": "json_schema", "schema": schema}
         try:
             response = await self._client.beta.messages.create(
-                model=self._settings.llm_model,
+                model=self._settings.resolved_llm_model,
                 max_tokens=self._settings.llm_max_tokens,
                 betas=[FALLBACK_BETA],
                 fallbacks="default",

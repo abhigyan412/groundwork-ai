@@ -19,6 +19,7 @@ import json
 import re
 import secrets
 import sys
+import time
 from dataclasses import replace
 from pathlib import Path
 from uuid import UUID
@@ -248,8 +249,45 @@ REF_VERDICTS = {
     10: {"d1": "TRUE", "d2": "FALSE", "d3": "UNKNOWN"},
 }
 
-# Claude Sonnet 5.5, USD per million tokens (cache writes: 5-minute TTL, 1.25x input).
-PRICE = {"input": 2.00, "output": 10.00, "cache_read": 0.20, "cache_write": 2.50}
+# USD per million tokens. Claude Sonnet 5.5 list prices (cache writes: 5-minute TTL, 1.25x input).
+# Gemini: the free tier costs nothing; pass --price-in/--price-out to estimate a paid tier.
+PRICES = {
+    "anthropic": {"input": 2.00, "output": 10.00, "cache_read": 0.20, "cache_write": 2.50},
+    "gemini": {"input": 0.0, "output": 0.0, "cache_read": 0.0, "cache_write": 0.0},
+    "fake": {"input": 0.0, "output": 0.0, "cache_read": 0.0, "cache_write": 0.0},
+}
+PRICE = PRICES["anthropic"]  # replaced in main() for the configured provider
+
+# Which reported stage an LLM method's time belongs to (for subtracting pacing waits).
+STAGE_OF = {
+    "decompose": "decompose",
+    "decompose_comparison": "decompose",
+    "extract_comparison_values": "decompose",
+    "compose": "compose",
+}
+
+
+class RateLimiter:
+    """At most `rpm` LLM calls in any 60-second window (free tiers: ~5-10 requests/minute)."""
+
+    def __init__(self, rpm: int) -> None:
+        self.rpm = rpm
+        self.calls: list[float] = []
+
+    async def acquire(self) -> float:
+        """Wait for a slot; returns seconds waited."""
+        if self.rpm <= 0:
+            return 0.0
+        waited = 0.0
+        while True:
+            now = time.monotonic()
+            self.calls = [t for t in self.calls if now - t < 60]
+            if len(self.calls) < self.rpm:
+                self.calls.append(now)
+                return waited
+            pause = 60 - (now - self.calls[0]) + 0.05
+            await asyncio.sleep(pause)
+            waited += pause
 
 
 class Recorder:
@@ -260,6 +298,7 @@ class Recorder:
         self.plans: list[DecisionPlan] = []
         self.feedback: list[list[str]] = []
         self.comparison: list[object] = []
+        self.paced_ms: dict[str, int] = {}  # stage -> ms spent waiting for the rate limiter
 
     def reset(self) -> None:
         self.__init__()
@@ -276,27 +315,36 @@ class RecordingNli:
 
 
 class RecordingLLM:
-    def __init__(self, inner, rec: Recorder) -> None:
-        self.inner, self.rec = inner, rec
+    def __init__(self, inner, rec: Recorder, limiter: RateLimiter) -> None:
+        self.inner, self.rec, self.limiter = inner, rec, limiter
+
+    async def _pace(self, method: str) -> None:
+        waited = await self.limiter.acquire()
+        stage = STAGE_OF[method]
+        self.rec.paced_ms[stage] = self.rec.paced_ms.get(stage, 0) + round(waited * 1000)
 
     async def decompose(self, question, chunks, feedback=None, previous=None):
         if feedback:
             self.rec.feedback.append(list(feedback))
+        await self._pace("decompose")
         plan = await self.inner.decompose(question, chunks, feedback=feedback, previous=previous)
         self.rec.plans.append(plan)
         return plan
 
     async def decompose_comparison(self, question, chunks):
+        await self._pace("decompose_comparison")
         plan = await self.inner.decompose_comparison(question, chunks)
         self.rec.comparison.append(plan)
         return plan
 
     async def extract_comparison_values(self, plan, chunks_by_option):
+        await self._pace("extract_comparison_values")
         values = await self.inner.extract_comparison_values(plan, chunks_by_option)
         self.rec.comparison.append(values)
         return values
 
     async def compose(self, data):
+        await self._pace("compose")
         return await self.inner.compose(data)
 
 
@@ -544,9 +592,20 @@ async def run_once(deps, questions, org_ids, rec, chunk_pages, threshold, n: int
         print(f"   answer ({r.answer_source}): {r.answer.replace(chr(10), ' / ')}")
         for note in answer_notes:
             print(f"   !! answer check: {note}")
-        t = r.timings_ms
+        # Exclude time spent waiting for the eval's own rate limiter (not visitor-facing latency).
+        t = dict(r.timings_ms)
+        paced = sum(rec.paced_ms.values())
+        for stage, ms in rec.paced_ms.items():
+            if isinstance(t.get(stage), int):
+                t[stage] -= ms
+        if paced and isinstance(t.get("total"), int):
+            t["total"] -= paced
         stages = ["classify", "retrieve", "decompose", "grounding", "decisions", "compose", "total"]
-        print("   latency ms: " + "  ".join(f"{k} {_fmt_ms(t, k)}" for k in stages))
+        print(
+            "   latency ms: "
+            + "  ".join(f"{k} {_fmt_ms(t, k)}" for k in stages)
+            + (f"   (excludes {paced} ms waiting for the eval's rate limiter)" if paced else "")
+        )
         print(
             f"   tokens: in {meter.input_tokens} (+{meter.cache_read_input_tokens} cache read, "
             f"+{meter.cache_creation_input_tokens} cache write)  out {meter.output_tokens}  "
@@ -659,8 +718,23 @@ async def main() -> int:
     )
     parser.add_argument("--runs", type=int, default=1)
     parser.add_argument("--json", type=Path, help="write per-question records here")
+    parser.add_argument(
+        "--rpm",
+        type=int,
+        default=None,
+        help="max LLM calls per minute (default: 8 for gemini's free tier, unlimited otherwise)",
+    )
+    parser.add_argument("--price-in", type=float, help="USD per million input tokens")
+    parser.add_argument("--price-out", type=float, help="USD per million output tokens")
     args = parser.parse_args()
     settings = get_settings()
+    global PRICE
+    PRICE = dict(PRICES[settings.llm_provider])
+    if args.price_in is not None:
+        PRICE["input"] = PRICE["cache_write"] = args.price_in
+    if args.price_out is not None:
+        PRICE["output"] = args.price_out
+    rpm = args.rpm if args.rpm is not None else (8 if settings.llm_provider == "gemini" else 0)
     if settings.model_backend != "local":
         sys.exit("Set MODEL_BACKEND=local: this evaluates the real models.")
     data = json.loads((ROOT / "sample_data/questions.json").read_text(encoding="utf-8"))
@@ -701,13 +775,19 @@ async def main() -> int:
                     print("LLM: reference plans (no API key); answers are extractive")
                 else:
                     print(
-                        f"LLM: {settings.llm_provider} {settings.llm_model} "
+                        f"LLM: {settings.llm_provider} {settings.resolved_llm_model} "
                         f"(effort: decompose {settings.llm_effort_decompose}, "
                         f"compose {settings.llm_effort_compose})"
                     )
                 rec = Recorder()
+                print(
+                    f"pacing: {f'at most {rpm} LLM calls per minute' if rpm else 'off'}; "
+                    f"prices per M tokens: in ${PRICE['input']}, out ${PRICE['output']}"
+                )
                 deps = replace(
-                    deps, nli=RecordingNli(deps.nli, rec), llm=RecordingLLM(deps.llm, rec)
+                    deps,
+                    nli=RecordingNli(deps.nli, rec),
+                    llm=RecordingLLM(deps.llm, rec, RateLimiter(rpm)),
                 )
                 chunk_pages: dict[str, str] = {}
                 async with app.state.db_pool.acquire() as conn:

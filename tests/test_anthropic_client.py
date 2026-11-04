@@ -77,7 +77,7 @@ async def test_decompose_request_shape_parsing_and_usage():
     assert isinstance(plan, DecisionPlan) and plan.decisions[0].value == 3.5
     (req,) = stub.requests
     s = get_settings()
-    assert req["model"] == s.llm_model == "claude-sonnet-5-5"
+    assert req["model"] == "claude-sonnet-5-5"  # provider default when LLM_MODEL is empty
     assert req["betas"] == [FALLBACK_BETA] and req["fallbacks"] == "default"
     assert req["output_config"]["effort"] == s.llm_effort_decompose
     assert req["output_config"]["format"]["type"] == "json_schema"

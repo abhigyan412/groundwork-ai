@@ -53,4 +53,6 @@ Unit tests for combiner, validator, normalization, policy patterns and compariso
   See `docs/ai-design.md` §2, §3 and §8.
 - With reference plans, `scripts/eval_engine.py` passes **18/18** (it was 8/18 before the fixes) with the real classifier, NLI, reranker and embeddings. This covers the predicted-route check for Q15–18: all are refused.
 - **Tests:** 227 pass offline, plus 21 opt-in real-NLI rule-check cases (`RUN_MODEL_TESTS=1`).
-- **Next:** end-to-end runs with Claude (`claude-sonnet-5-5`).
+- Claude runs blocked (no Anthropic credits). The demo LLM provider is now Gemini (ADR 0011); the Anthropic client is kept.
+- **Next:** end-to-end runs with Gemini (`scripts/eval_engine.py --runs 2`, paced at 8 calls/minute).
+- **Known issue (not fixed yet):** Q11 "Can unused casual leave be carried forward?" was routed to the decision path instead of the policy path.

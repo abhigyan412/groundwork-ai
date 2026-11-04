@@ -14,3 +14,4 @@ One file per significant decision. Format: context, decision, consequences.
 | 0008 | Typed fact checks with NLI rule grounding | Accepted |
 | 0009 | Comparison by extraction, decided by code | Accepted |
 | 0010 | Policy hypotheses from question patterns | Accepted |
+| 0011 | Gemini free tier as the demo LLM provider | Accepted |
