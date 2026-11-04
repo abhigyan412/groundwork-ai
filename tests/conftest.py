@@ -27,6 +27,9 @@ os.environ["ASSISTANT_TOKEN_KEY"] = Fernet.generate_key().decode()
 os.environ["LLM_PROVIDER"] = "fake"
 os.environ["MODEL_BACKEND"] = "fake"
 os.environ.setdefault("STORAGE_DIR", os.path.join(os.path.dirname(__file__), ".storage"))
+os.environ["CLASSIFIER_PATH"] = os.path.join(
+    os.path.dirname(__file__), ".storage", "classifier.joblib"
+)
 
 import httpx  # noqa: E402
 

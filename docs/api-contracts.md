@@ -95,14 +95,25 @@ Response 200:
                  "value": "TRUE", "confidence": 1.0, "user_value": 3.6, "missing_fact": null,
                  "source": { "file": "Scholarship_Rules.pdf", "page": 4, "excerpt": "Applicants must hold…" },
                  "reason": null }],
-  "timings_ms": { "retrieve": 120, "classify": 8, "decisions": { "d1": 1, "d2": 1, "d3": 140 }, "compose": 900 }
+  "timings_ms": { "retrieve": 120, "classify": 8, "decompose": 2100, "grounding": 160,
+                  "decisions": { "d1": 1, "d2": 1, "d3": 140 }, "compose": 900, "total": 3300 },
+  "overall": "TRUE",
+  "confidence": 1.0,
+  "answer_source": "llm"
 }
 ```
+
+- `route`: the path actually taken (`null` when stopped at the gate). A policy question with no matching pattern, or a comparison the LLM couldn't structure, reports `decision`.
+- `overall`: combined result on the decision, policy and comparison paths; `null` for direct and procedural answers.
+- `confidence`: minimum confidence of the deciding verdicts (decision path only).
+- `answer_source`: `llm`; `template` when `compose()` failed but verdicts existed (the answer is built by code from them); `none` for gate refusals.
+- `verdicts[].kind`: `fact` | `nli` | `policy` | `choice` | `score`. Comparison verdicts carry `detail` (e.g. "32,000 INR per semester"); TRUE marks the chosen option.
 
 | Error | Status | Message |
 |---|---|---|
 | Invalid / revoked token | 401 | This assistant link is invalid or has been reset |
 | Empty question | 400 | Please enter a question |
 | No relevant knowledge | 200 | `outcome: unanswered` with explanation |
-| LLM failure | 200 / 503 | Verdicts still returned if available; "Couldn't generate an answer, please try again" |
+| LLM failure, verdicts exist | 200 | Template answer built from the verdicts (`answer_source: "template"`) |
+| LLM failure, no verdicts | 503 | Couldn't generate an answer, please try again |
 | Decision-model failure | 200 | Affected decision is UNKNOWN; `outcome: review` |

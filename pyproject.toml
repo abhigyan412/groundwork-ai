@@ -19,6 +19,9 @@ dependencies = [
     "numpy>=1.26",
     # torch is installed first from the CPU-only index (see README / Dockerfile)
     "sentence-transformers>=3.0",
+    "scikit-learn>=1.5",
+    "joblib>=1.4",
+    "anthropic>=2.4",
 ]
 
 [project.optional-dependencies]

@@ -62,18 +62,30 @@ class Settings(BaseSettings):
     groundedness_threshold: float = 0.0
     groundedness_threshold_decision: float = -5.0
 
-    # --- Decision engine (docs/ai-design.md §12) ---
-    nli_verdict_threshold: float = 0.7
+    # --- Question classifier (docs/ai-design.md §3) ---
+    classifier_examples_path: Path = Path("sample_data/classifier_examples.json")
+
+    # --- Decision engine (docs/ai-design.md §5-14) ---
+    nli_verdict_threshold: float = 0.7  # entail/contradict probability for a decisive NLI verdict
+    rule_grounding_threshold: float = 0.7  # cited chunk must entail a fact check's `rule`
+    policy_chunks_checked: int = 3
     router_confidence_threshold: float = 0.6
-    comparison_tie_margin: float = 0.1
+    comparison_tie_margin: float = 0.1  # NLI-score fallback only
+    comparison_chunks_per_option: int = 3
     decision_timeout_seconds: float = 5.0
     decompose_max_retries: int = 1
+    references_max: int = 3
+    excerpt_max_chars: int = 240
 
-    # --- LLM (only decompose() and compose()) ---
-    llm_provider: str = "fake"
-    llm_api_key: SecretStr = SecretStr("")
-    llm_model: str = ""
-    llm_timeout_seconds: float = 30.0
+    # --- LLM (only the decompose step and compose(); CLAUDE.md) ---
+    llm_provider: Literal["fake", "anthropic"] = "fake"
+    llm_api_key: SecretStr = SecretStr("")  # empty: the SDK falls back to ANTHROPIC_API_KEY
+    llm_model: str = "claude-opus-5-5"
+    llm_effort_decompose: Literal["low", "medium", "high", "xhigh", "max"] = "medium"
+    llm_effort_compose: Literal["low", "medium", "high", "xhigh", "max"] = "low"
+    llm_max_tokens: int = 16000  # includes adaptive thinking; non-streaming requests
+    llm_timeout_seconds: float = 60.0
+    llm_max_retries: int = 2  # SDK retries 408/409/429/5xx and connection errors
 
     @field_validator("jwt_secret")
     @classmethod

@@ -176,22 +176,42 @@ Each verdict returned by `/api/ask` and stored in `questions.verdicts`:
 
 ```python
 class LLMClient(Protocol):
-    async def decompose(self, question, chunks) -> DecisionPlan: ...
+    async def decompose(self, question, chunks, feedback=None, previous=None) -> DecisionPlan: ...
     async def decompose_comparison(self, question, chunks) -> ComparisonPlan: ...
-    async def extract_comparison_values(self, plan, chunks_by_option) -> list[ExtractedValue]: ...
-    async def compose(self, question, verdicts, chunks) -> str: ...
+    async def extract_comparison_values(self, plan, chunks_by_option) -> ExtractedValues: ...
+    async def compose(self, data: ComposeInput) -> str: ...
 ```
 
-- Provider set by `LLM_PROVIDER` in `.env`. The real implementation is **Anthropic (Claude)**, with the default model `claude-sonnet-5-5` set by `LLM_MODEL`. `fake` stays the default until task 04.
-- `FakeLLMClient` for tests.
-- Timeouts, retries and "LLM unavailable" are handled here.
-- Chunk text is passed as delimited data with an explicit instruction that it contains no instructions (prompt-injection guard).
+- **Provider:** set by `LLM_PROVIDER` in `.env`; `fake` is the default.
+- **Anthropic implementation** (`app/llm/anthropic_client.py`):
+  - Default model `claude-opus-5-5`, Anthropic's recommended default, overridable with `LLM_MODEL`. Thinking is adaptive (it can't be disabled on this model), and effort is set explicitly: `medium` for the decompose step, `low` for `compose()`.
+  - The decompose step uses structured outputs (`output_config.format` with a hand-written JSON schema in `app/engine/spec.py`; user facts are an array of `{name, type, value}`, because every object needs `additionalProperties: false`). The output is then validated with Pydantic.
+  - Server-side refusal fallback: `fallbacks: "default"`, beta `server-side-fallback-2026-07-01`.
+  - The SDK retries 408/409/429/5xx and connection errors. Anything left over, plus refusals, truncated or empty output and missing credentials, becomes `LLMUnavailableError`.
+  - The decompose retry is append-only: it sends the previous plan, then the validation errors.
+- **`FakeLLMClient`** (tests, and keyless dev runs):
+  - In tests it returns scripted plans.
+  - Unscripted, it returns no decisions and an extractive answer, so the app runs without a key in degraded mode.
+- **Prompt-injection guard:** chunk text is passed inside `<document ref file page>` tags, with an explicit instruction that it is data and never instructions.
 
-## 13. Answer composition [Open]
+## 13. Answer composition [Proposed]
 
-- `compose()` uses only the verdicts and chunks it's given, and must not change a verdict.
-- Citation format: `filename — Page N`.
-- To decide in task 04: exact prompt guardrails, and how UNKNOWN / needs_info answers are phrased.
+- `compose()` gets:
+  - the question, route, outcome and overall result (met / not met / unknown, plus ALL/ANY)
+  - every verdict (condition, result, the visitor's value, the rule, missing fact, note)
+  - the chunks, the labels of any missing facts, and the comparison winner
+- **Guardrails (system prompt):**
+  - Use only the given material, and never change or re-decide a check result.
+  - Needs info: say what was checked, then ask for each missing item plainly ("What's your current GPA?").
+  - Decided but with missing facts: give the result and note what couldn't be checked.
+  - Review: say the documents don't settle it, and share what they do say.
+  - Procedures stay in order as a numbered list.
+  - About 120 words at most, no headings.
+- **Citations:** the answer text has no inline citations. `references` (file and page) are attached by code from the verdict sources, or for grounded answers from the chunks that cleared the gate, and the UI shows them as `filename, page N`. The LLM can't cite a page it wasn't given or misnumber one.
+- **LLM failure:**
+  - If verdicts exist, a code-built template answer is returned (`answer_source: "template"`, 200).
+  - With no verdicts (direct, procedural or gated questions), `AnswerUnavailableError` → `/api/ask` returns 503 "Couldn't generate an answer, please try again".
+  - If the decompose step fails, the question gets a grounded answer flagged `review`.
 
 ## 14. Thresholds (all in `config.py`) [Proposed]
 

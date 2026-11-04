@@ -15,9 +15,13 @@ from app.admin.routes import router as admin_router
 from app.auth.routes import router as auth_router
 from app.config import PRODUCT_NAME, get_settings
 from app.db.pool import create_pool
+from app.engine.pipeline import EngineDeps
 from app.errors import install_error_handlers
 from app.ingestion.pipeline import IngestionQueue
+from app.llm import load_llm
+from app.ml.classifier import load_or_train, model_key
 from app.ml.embedder import load_embedder
+from app.ml.nli import load_nli
 from app.ml.reranker import load_reranker
 
 log = logging.getLogger(__name__)
@@ -28,7 +32,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     settings.storage_dir.mkdir(parents=True, exist_ok=True)
     app.state.db_pool = await create_pool(settings.database_url)
-    # System 1 models load once here. NLI and the question classifier join in task 04.
+    # System 1 models load once here (embedder, reranker, NLI, question classifier).
     app.state.embedder = await asyncio.to_thread(
         load_embedder,
         settings.model_backend,
@@ -38,6 +42,24 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     app.state.reranker = await asyncio.to_thread(
         load_reranker, settings.model_backend, settings.reranker_model
+    )
+    app.state.nli = await asyncio.to_thread(load_nli, settings.model_backend, settings.nli_model)
+    app.state.classifier = await asyncio.to_thread(
+        load_or_train,
+        app.state.embedder,
+        model_key(settings.model_backend, settings.embedding_model),
+        settings.classifier_path,
+        settings.classifier_examples_path,
+    )
+    app.state.llm = load_llm(settings)
+    app.state.engine = EngineDeps(
+        pool=app.state.db_pool,
+        embedder=app.state.embedder,
+        reranker=app.state.reranker,
+        nli=app.state.nli,
+        classifier=app.state.classifier,
+        llm=app.state.llm,
+        settings=settings,
     )
     app.state.ingestion = IngestionQueue(app.state.db_pool, app.state.embedder, settings)
     resumed = await app.state.ingestion.requeue_interrupted()
