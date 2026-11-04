@@ -85,6 +85,14 @@ class Settings(BaseSettings):
     references_max: int = 3
     excerpt_max_chars: int = 240
 
+    # --- Assistant / public API (task 05) ---
+    ask_max_question_chars: int = 1000
+    # Per assistant token, per API process (in memory). Protects the LLM quota from one widget.
+    ask_rate_limit_per_minute: int = 20
+    suggested_questions_max: int = 3
+    embed_width: int = 400
+    embed_height: int = 600
+
     # --- LLM (only the decompose step and compose(); CLAUDE.md) ---
     # gemini: the demo default (free tier). anthropic: Claude. fake: no network (tests, offline).
     llm_provider: Literal["gemini", "anthropic", "fake"] = "gemini"

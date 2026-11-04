@@ -10,8 +10,10 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from app.admin.assistant import router as assistant_router
 from app.admin.documents import router as documents_router
 from app.admin.routes import router as admin_router
+from app.admin.usage import router as usage_router
 from app.auth.routes import router as auth_router
 from app.config import PRODUCT_NAME, get_settings
 from app.db.pool import create_pool
@@ -23,6 +25,7 @@ from app.ml.classifier import load_or_train, model_key
 from app.ml.embedder import load_embedder
 from app.ml.nli import load_nli
 from app.ml.reranker import load_reranker
+from app.public.routes import router as public_router
 
 log = logging.getLogger(__name__)
 
@@ -79,11 +82,21 @@ class HealthResponse(BaseModel):
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title=f"{PRODUCT_NAME} API", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(
+        title=f"{PRODUCT_NAME} API",
+        version="0.1.0",
+        lifespan=lifespan,
+        # operationId = route name (ask, get_assistant, list_documents, …): clean names in the
+        # frontend's generated client types.
+        generate_unique_id_function=lambda route: route.name,
+    )
     install_error_handlers(app)
     app.include_router(auth_router)
     app.include_router(admin_router)
     app.include_router(documents_router)
+    app.include_router(assistant_router)
+    app.include_router(usage_router)
+    app.include_router(public_router)
 
     @app.get("/health", tags=["ops"], responses={503: {"model": HealthResponse}})
     async def health(request: Request) -> HealthResponse:

@@ -34,7 +34,8 @@
 
 ## Other
 
-- Basic per-token rate limit on `/api/ask` (optional).
+- Per-assistant rate limit on `/api/ask`: 20 questions per minute (`ASK_RATE_LIMIT_PER_MINUTE`), held in memory per API process. Several processes would need a shared store such as Redis. It also protects the LLM quota from one busy widget.
+- A token that can't be real (empty, or over 200 characters, e.g. an admin JWT) is rejected with 401 before any database lookup.
 - No secrets committed; `.env.example` lists required variables.
 - Text from PDFs is treated as data in LLM prompts, never as instructions.
 

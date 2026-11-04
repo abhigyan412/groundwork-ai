@@ -52,12 +52,12 @@ Last run (task 03): **18/18**. Margins: +1.98 (strict gate), +3.74 (decision gat
 
 ## Isolation tests (pytest)
 
-- [ ] Org A's token asks about content only in org B's documents → unanswered
-- [ ] Org A's JWT deletes org B's document → 404
-- [ ] Org A's JWT lists documents → only its own
-- [ ] Assistant token on admin routes → 401
-- [ ] Revoked token on `/api/ask` → 401
-- [ ] Retrieval for org A never returns chunks with org B's `org_id`
+- [x] Org A's token asks about content only in org B's documents → unanswered (`test_assistant_api.py`, `test_pipeline.py`)
+- [x] Org A's JWT deletes org B's document → 404 (`test_documents.py`)
+- [x] Org A's JWT lists documents → only its own (`test_documents.py`)
+- [x] Assistant token on admin routes → 401 (`test_assistant_api.py`)
+- [x] Revoked token on `/api/ask` → 401 (`test_assistant_api.py`)
+- [x] Retrieval for org A never returns chunks with org B's `org_id` (`test_retrieval.py`)
 
 ## Unit tests
 

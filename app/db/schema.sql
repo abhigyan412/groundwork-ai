@@ -79,7 +79,9 @@ CREATE TABLE IF NOT EXISTS questions (
     verdicts     jsonb NOT NULL DEFAULT '[]'::jsonb,
     "references" jsonb NOT NULL DEFAULT '[]'::jsonb,  -- quoted: REFERENCES is a reserved word
     timings_ms   jsonb NOT NULL DEFAULT '{}'::jsonb,
+    llm_usage    jsonb NOT NULL DEFAULT '{}'::jsonb,  -- {input_tokens, output_tokens, calls, model}
     latency_ms   integer,
     created_at   timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS llm_usage jsonb NOT NULL DEFAULT '{}'::jsonb;
 CREATE INDEX IF NOT EXISTS questions_org_created_idx ON questions (org_id, created_at DESC);

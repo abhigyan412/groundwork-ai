@@ -60,29 +60,31 @@ Replace the file behind a document (the row menu's "Replace"). Multipart `file`,
 Response 204: removes the row, its chunks and the stored file. Error 404 `"Document not found."` if not found, malformed id, **or owned by another org** (no difference revealed).
 
 ### GET /api/admin/assistant
-Response 200: `{ "url": "https://host/a/<token-prefix>…", "embed_code": "<iframe …>", "created_at" }`
-The full token is only returned on creation/regeneration.
+Response 200: `{ "url": "https://host/a/<token>", "embed_code": "<iframe …>", "token_prefix", "created_at" }`
+- The first call creates the org's assistant.
+- The full link is shown on every call, decrypted from the stored encrypted copy (ADR 0007). Public routes look tokens up only by hash.
+- Error 409 "This link can't be shown because the server's key changed. Reset the link to create a new one." if `ASSISTANT_TOKEN_KEY` changed since the link was created.
 
 ### POST /api/admin/assistant/regenerate
-Response 200: `{ "token", "url", "embed_code" }`. Old token revoked immediately.
+Response 200: `{ "token", "url", "embed_code", "token_prefix", "created_at" }`. The old token is revoked in the same transaction, so it stops working immediately.
 
 ### GET /api/admin/usage
-Response 200: `{ "asked": int, "answered": int, "unanswered": int, "needs_info": int, "review": int }`
+Response 200: `{ "asked": int, "answered": int, "unanswered": int, "needs_info": int, "review": int }`. `asked` is the total; a question that got a 503 (LLM unavailable) is logged and counted as `review`.
 
 ### GET /api/admin/questions?limit=20
-Response 200: `{ "questions": [{ "id", "question", "route", "outcome", "answer", "verdicts", "references", "created_at" }] }`
-Recent questions for the usage page, including the stored evidence trail.
+Response 200: `{ "questions": [{ "id", "question", "route", "outcome", "answer", "verdicts", "references", "timings_ms", "created_at" }] }`
+Recent questions for the usage page, newest first, including the stored evidence trail (`verdicts` and `timings_ms` have the same shapes as in `/api/ask`). `limit` is 1–100 (400 otherwise).
 
 ## Public
 
 The widget page itself is a React route (`/a/:token`) served by nginx; it calls the endpoints below.
 
 ### GET /api/public/assistant/{token}
-Response 200: `{ "org_name": str, "suggested_questions": [str] }`
+Response 200: `{ "org_name": str, "suggested_questions": [str] }`. Suggested questions are built by code from the org's ready documents (up to 3: "What does the Hostel Policy document cover?"). No LLM call.
 Errors: 401 invalid or revoked token (widget shows "This assistant link is no longer active").
 
 ### POST /api/ask
-Request: `{ "token": str, "question": str }`
+Request: `{ "token": str, "question": str }`. The token is checked first, so a dead link always gets 401. Any other field (e.g. `org_id`) is ignored. Whitespace in the question is normalized; at most 1000 characters. Every question is logged to `questions` with its route, outcome, answer, verdicts, references, timings and LLM token usage.
 
 Response 200:
 ```json
@@ -113,6 +115,8 @@ Response 200:
 |---|---|---|
 | Invalid / revoked token | 401 | This assistant link is invalid or has been reset |
 | Empty question | 400 | Please enter a question |
+| Question over 1000 characters | 400 | Questions can be up to 1000 characters. |
+| More than 20 questions a minute for one assistant | 429 | Too many questions right now. Please wait a minute. |
 | No relevant knowledge | 200 | `outcome: unanswered` with explanation |
 | LLM failure, verdicts exist | 200 | Template answer built from the verdicts (`answer_source: "template"`) |
 | LLM failure, no verdicts | 503 | Couldn't generate an answer, please try again |

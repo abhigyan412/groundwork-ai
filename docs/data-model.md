@@ -74,7 +74,8 @@ Indexes: `(org_id)`, `(document_id)`, HNSW (`vector_cosine_ops`) on `embedding`,
 | verdicts | jsonb | evidence trail for the usage panel |
 | references | jsonb | `[{file, page}]` (column name is quoted in SQL: reserved word) |
 | timings_ms | jsonb | same shape as `/api/ask` `timings_ms`, so the usage panel can draw the timing strip |
-| latency_ms | int | |
+| llm_usage | jsonb | `{calls, input_tokens, output_tokens, cache_read_input_tokens, models}` for cost tracking |
+| latency_ms | int | end to end, including LLM retries |
 | created_at | timestamptz | |
 
 ## Relations
