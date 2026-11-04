@@ -56,7 +56,11 @@ class Settings(BaseSettings):
     retrieval_candidates: int = 20
     rerank_top_k: int = 5
     rrf_k: int = 60
-    groundedness_threshold: float = 0.0  # reranker logit; tuned on test data in task 07
+    # Groundedness gate on the top reranker logit, per route (docs/ai-design.md §2). Tuned with
+    # scripts/eval_retrieval.py: decision questions carry personal facts that aren't in the rule
+    # text, so a correct match scores lower and gets a looser gate.
+    groundedness_threshold: float = 0.0
+    groundedness_threshold_decision: float = -5.0
 
     # --- Decision engine (docs/ai-design.md §12) ---
     nli_verdict_threshold: float = 0.7

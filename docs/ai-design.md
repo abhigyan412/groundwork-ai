@@ -11,15 +11,30 @@ The LLM works only at the edges:
 
 Everything in between is System 1 models or application code: classification, routing, gating, rule grounding, fact checks, NLI decisions, comparison and combination. The LLM never produces a verdict.
 
-## 1. Retrieval [Proposed]
+## 1. Retrieval [Confirmed]
 
-- Hybrid search: pgvector cosine plus `tsvector` keyword search, merged with reciprocal rank fusion (RRF).
-- Rerank the top ~20 with the cross-encoder and keep the top ~5.
-- Always filtered by `org_id` from the validated token.
+- Hybrid search: pgvector cosine (bge query prefix; HNSW with `hnsw.iterative_scan = strict_order` so the `org_id` filter can't starve small orgs) plus `tsvector` keyword search (question words OR-ed, ranked by `ts_rank_cd`). 20 candidates each, merged with reciprocal rank fusion (RRF, k = 60).
+- Rerank the fused top 20 with the cross-encoder and keep the top 5.
+- Always filtered by `org_id` from the validated token, and only `ready` documents are searched.
 
-## 2. Groundedness gate [Proposed]
+## 2. Groundedness gate [Confirmed]
 
-If the top reranker score is below a threshold, the answer is "The documents for {org} don't cover this." No LLM call is made, and the question is logged as `unanswered` with `route = null`.
+If the top reranker score is below the route's threshold, the answer is "The documents for {org} don't cover this." No LLM call is made, and the question is logged as `unanswered` with `route = null`.
+
+The threshold depends on the route, because retrieval and classification run in parallel and the gate is applied once both finish:
+
+| Route | Threshold (reranker logit) |
+|---|---|
+| direct, procedural, policy, comparison | 0.0 |
+| decision | −5.0 |
+
+Decision questions carry personal facts ("3rd year, 82% attendance, sports scholarship") that aren't in the rule text, so a correct match scores lower: Q5 scores −1.26. A single threshold can't separate that from a short near miss like "How many weeks of parental leave?", which scores −1.57 against the leave policy.
+
+Tuned with `scripts/eval_retrieval.py` on the 18 questions in `sample_data/questions.json` (real models), all 18 correct:
+- the lowest in-KB score is +1.98 for non-decision routes and −1.26 for decision questions
+- the highest not-in-KB score is −1.57
+
+Known risk: a short not-in-KB question that the classifier misroutes to "decision" gets the looser gate (Q17 would). Task 04 re-runs the eval with predicted routes.
 
 ## 3. Question classifier (System 1) [Proposed]
 
@@ -187,7 +202,8 @@ class LLMClient(Protocol):
 | Policy path: chunks checked | 3 |
 | Router confidence | 0.6 |
 | Comparison tie (NLI fallback) | 0.1 |
-| Groundedness gate | tuned on test data |
+| Groundedness gate: direct / procedural / policy / comparison | 0.0 (reranker logit) |
+| Groundedness gate: decision | −5.0 (reranker logit) |
 
 ## 15. Transparency
 

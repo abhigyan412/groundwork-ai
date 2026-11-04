@@ -35,7 +35,20 @@ Self-written PDFs with deliberately clean, testable rules.
 | 13 | Co | What is the employee stock option policy? | Not in KB | Gate → unanswered |
 | 14 | Co | What is the merit scholarship GPA requirement? | Isolation | Gate → unanswered (uni data not used) |
 
+| 15 | Uni | Does the hostel have a gym, and when is it open? | Not in KB (near miss) | Gate → unanswered |
+| 16 | Uni | What is the fee for a supplementary exam? | Not in KB (near miss) | Gate → unanswered |
+| 17 | Co | How many weeks of parental leave do employees get? | Not in KB (near miss) | Gate → unanswered |
+| 18 | Co | What is the daily meal allowance on business trips? | Not in KB (near miss) | Gate → unanswered |
+
+All 18 are in `sample_data/questions.json` with their expected sources.
+
 For each run, record: route taken, verdicts, outcome, references, and whether it matched the expectation.
+
+## Retrieval evaluation (`scripts/eval_retrieval.py`, real models)
+
+Checks that each in-KB question's expected file/page appears in the top 3 reranked chunks and passes the gate, and that each not-in-KB question is stopped by the gate. It also reports the score margins and which not-in-KB questions would leak if misrouted to "decision".
+
+Last run (task 03): **18/18**. Margins: +1.98 (strict gate), +3.74 (decision gate), +1.57 (strict gate vs the highest not-in-KB score). Q17 would leak if misrouted.
 
 ## Isolation tests (pytest)
 

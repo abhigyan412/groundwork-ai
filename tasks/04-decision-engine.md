@@ -11,6 +11,8 @@ Route each question; run structured decisions with System 1 models in parallel; 
 - [ ] Label 60–80 example questions (`sample_data/classifier_examples.json`)
 - [ ] `scripts/train_classifier.py` → `.joblib`
 - [ ] Router with low-confidence fallback to decision path
+- [ ] Apply the per-route groundedness gate (`passes_gate`) after `gather(classify, retrieve)`
+- [ ] Re-run `scripts/eval_retrieval.py` with the classifier's *predicted* routes; confirm near misses (Q15–18) aren't misrouted to decision (Q17 would leak)
 
 ### LLM client
 - [ ] `LLMClient` protocol (`decompose`, `decompose_comparison`, `extract_comparison_values`, `compose`), Anthropic implementation

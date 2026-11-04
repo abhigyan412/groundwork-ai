@@ -18,6 +18,7 @@ from app.db.pool import create_pool
 from app.errors import install_error_handlers
 from app.ingestion.pipeline import IngestionQueue
 from app.ml.embedder import load_embedder
+from app.ml.reranker import load_reranker
 
 log = logging.getLogger(__name__)
 
@@ -27,13 +28,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     settings.storage_dir.mkdir(parents=True, exist_ok=True)
     app.state.db_pool = await create_pool(settings.database_url)
-    # System 1 models load once here. The reranker, NLI and classifier join in tasks 03-04.
+    # System 1 models load once here. NLI and the question classifier join in task 04.
     app.state.embedder = await asyncio.to_thread(
         load_embedder,
         settings.model_backend,
         settings.embedding_model,
         settings.embedding_dim,
         settings.embed_batch_size,
+    )
+    app.state.reranker = await asyncio.to_thread(
+        load_reranker, settings.model_backend, settings.reranker_model
     )
     app.state.ingestion = IngestionQueue(app.state.db_pool, app.state.embedder, settings)
     resumed = await app.state.ingestion.requeue_interrupted()
