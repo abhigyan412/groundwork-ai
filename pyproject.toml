@@ -14,6 +14,11 @@ dependencies = [
     "pyjwt>=2.9",
     "argon2-cffi>=23.1",
     "cryptography>=43",
+    "python-multipart>=0.0.9",
+    "pymupdf>=1.24",
+    "numpy>=1.26",
+    # torch is installed first from the CPU-only index (see README / Dockerfile)
+    "sentence-transformers>=3.0",
 ]
 
 [project.optional-dependencies]
@@ -43,7 +48,7 @@ select = ["E", "F", "I", "B", "UP", "ASYNC", "S", "RUF"]
 ignore = ["S101"]  # asserts are fine in tests
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S105", "S106", "E501"]
+"tests/**" = ["S105", "S106", "E501", "ASYNC240"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

@@ -47,14 +47,14 @@ nginx serves the React build and proxies `/api` and `/auth` to FastAPI, so the b
 
 ## Ingestion flow [Proposed]
 
-1. **Validate:** PDF magic bytes and parseable, ≤ 10 MB, ≤ 20 pages, org has < 10 documents.
-2. **Store** privately at `storage/{org_id}/{document_id}.pdf`.
-3. **Extract** text per page (PyMuPDF). Pages without text are flagged; OCR is out of scope.
-4. **Chunk** within each page, ~400–500 tokens with small overlap; keep `document_id`, `filename`, `page`.
-5. **Embed** and build `tsvector`.
-6. **Mark** `ready`, or `failed` with the reason.
+1. **Validate:** org has < 10 non-failed documents (checked first, and again under a per-org row lock), ≤ 10 MB (read with a cap), PDF header in the first 1024 bytes, parseable, not password-protected, 1–20 pages.
+2. **Store** privately at `storage/{org_id}/{document_id}.pdf` (path from UUIDs only; atomic write).
+3. **Extract** text per page (PyMuPDF), block by block: each paragraph, list item or table row becomes one line (no mid-sentence breaks at visual line wraps), with de-hyphenation and NFKC normalization (ligatures like "ﬃ" become "ffi"). Pages without text are listed in `pages_without_text`; a PDF with no text at all fails with a clear reason. OCR is out of scope.
+4. **Chunk** within each page: lines packed up to 450 tokens (bge tokenizer), 50-token overlap; over-long lines split by sentence, then by words. Line breaks are kept so numbered steps stay in order.
+5. **Embed** passages with bge-small (L2-normalized); `tsvector` is a generated column.
+6. **Store and mark** `ready` in one transaction, only if the document still exists at the same `generation` (not deleted or replaced meanwhile); otherwise `failed` with the reason.
 
-Steps 3–6 run as a FastAPI background task; the dashboard shows status.
+Steps 3–6 run as in-process asyncio tasks (`IngestionQueue`, max 2 documents at once). Documents left `processing` by a restart are resumed on startup. The dashboard polls the list for status.
 
 ## Ask flow
 

@@ -25,6 +25,7 @@ os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 os.environ["JWT_SECRET"] = secrets.token_urlsafe(48)
 os.environ["ASSISTANT_TOKEN_KEY"] = Fernet.generate_key().decode()
 os.environ["LLM_PROVIDER"] = "fake"
+os.environ["MODEL_BACKEND"] = "fake"
 os.environ.setdefault("STORAGE_DIR", os.path.join(os.path.dirname(__file__), ".storage"))
 
 import httpx  # noqa: E402
@@ -36,8 +37,12 @@ get_settings.cache_clear()
 
 
 @pytest.fixture
-async def client() -> AsyncIterator[httpx.AsyncClient]:
-    app = create_app()
+def app():
+    return create_app()
+
+
+@pytest.fixture
+async def client(app) -> AsyncIterator[httpx.AsyncClient]:
     async with app.router.lifespan_context(app):  # applies schema, opens the pool
         async with app.state.db_pool.acquire() as conn:
             # Cascades to users, assistants, documents, chunks, questions.
@@ -45,6 +50,7 @@ async def client() -> AsyncIterator[httpx.AsyncClient]:
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
             yield c
+        await app.state.ingestion.drain()
 
 
 @pytest.fixture

@@ -43,7 +43,10 @@ Partial unique index on `(org_id) WHERE revoked_at IS NULL`: at most one active 
 | size_bytes | int | |
 | page_count | int null | null until the PDF is parsed |
 | status | text | `processing` / `ready` / `failed` |
-| error | text null | failure reason |
+| error | text null | failure reason, shown to the user |
+| pages_without_text | int[] | pages with no extractable text (flagged; OCR is out of scope) |
+| generation | int | bumped on replace; processing results for an older generation are discarded |
+| updated_at | timestamptz | |
 | created_at | timestamptz | |
 
 ### chunks

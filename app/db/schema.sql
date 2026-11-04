@@ -43,8 +43,15 @@ CREATE TABLE IF NOT EXISTS documents (
     status        text NOT NULL DEFAULT 'processing'
                   CHECK (status IN ('processing', 'ready', 'failed')),
     error         text,
-    created_at    timestamptz NOT NULL DEFAULT now()
+    pages_without_text integer[] NOT NULL DEFAULT '{}',  -- flagged, not OCR'd
+    generation    integer NOT NULL DEFAULT 1,  -- bumped on replace; stale processing results are discarded
+    created_at    timestamptz NOT NULL DEFAULT now(),
+    updated_at    timestamptz NOT NULL DEFAULT now()
 );
+-- Columns added after task 01 (keeps existing dev databases in step).
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS pages_without_text integer[] NOT NULL DEFAULT '{}';
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS generation integer NOT NULL DEFAULT 1;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
 CREATE INDEX IF NOT EXISTS documents_org_id_idx ON documents (org_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS chunks (

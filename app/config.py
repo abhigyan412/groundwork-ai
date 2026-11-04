@@ -6,6 +6,7 @@ defaults are the [Proposed] values from docs/ai-design.md §12 and docs/requirem
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -37,10 +38,14 @@ class Settings(BaseSettings):
     max_pdf_bytes: int = 10 * 1024 * 1024
 
     # --- Ingestion ---
-    chunk_target_tokens: int = 450
+    chunk_target_tokens: int = 450  # bge-small truncates at 512 tokens
     chunk_overlap_tokens: int = 50
+    processing_concurrency: int = 2  # documents processed at once (CPU-bound)
+    embed_batch_size: int = 32
 
     # --- Models (System 1) ---
+    # "fake" swaps in deterministic stand-ins (tests only); "local" loads the real models.
+    model_backend: Literal["local", "fake"] = "local"
     embedding_model: str = "BAAI/bge-small-en-v1.5"
     embedding_dim: int = 384  # must match chunks.embedding vector(384) in schema.sql
     reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"

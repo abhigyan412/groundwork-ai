@@ -35,24 +35,29 @@ Response 200: `{ "org": { "id", "name" }, "email" }`. Used by the app shell.
 Response 200: `{ "status": "ok", "db": "ok" }`; 503 with `db: "unavailable"` if Postgres is unreachable. No auth.
 
 ### GET /api/admin/documents
-Response 200:
+Response 200 (newest first):
 ```json
-{ "documents": [{ "id", "filename", "page_count", "size_bytes", "status", "error", "created_at" }],
+{ "documents": [{ "id", "filename", "page_count", "size_bytes", "status", "error", "pages_without_text": [2], "created_at" }],
   "limits": { "documents_used": 4, "documents_max": 10, "max_pages": 20, "max_mb": 10 } }
 ```
 
 ### POST /api/admin/documents
-Multipart `file`. Response 202: `{ "id", "filename", "status": "processing" }`
+Multipart `file`. Response 202: `{ "id", "filename", "status": "processing" }`. Processing (extract → chunk → embed) runs in the background; poll the list until `status` is `ready` or `failed` (`error` says why, e.g. "No readable text found. Scanned PDFs aren't supported; upload a text-based PDF."). `filename` is the uploaded name with any directory parts removed.
 
 | Error | Status | Message |
 |---|---|---|
-| Not a PDF / corrupt | 400 | File is not a valid PDF |
-| > 10 MB | 413 | PDF exceeds the 10 MB limit |
-| > 20 pages | 400 | PDF has N pages; the limit is 20 |
-| 10 documents already | 409 | Document limit reached (10). Delete one to upload more. |
+| Not a PDF / corrupt / empty | 400 | This file isn't a valid PDF. |
+| Password-protected | 400 | This PDF is password-protected. Remove the password and upload it again. |
+| > 10 MB | 413 | This PDF is 12.4 MB. The limit is 10 MB. |
+| > 20 pages | 400 | This PDF has 24 pages. The limit is 20. |
+| 10 documents already (failed ones don't count) | 409 | Document limit reached (10). Delete one to upload more. |
+| No file | 400 | File is required. |
+
+### PUT /api/admin/documents/{id}
+Replace the file behind a document (the row menu's "Replace"). Multipart `file`, same validation and errors as upload. Keeps the document's slot, so it works at 10/10 (except when replacing a `failed` document at the limit → 409). The old chunks are dropped and the new file is processed. Response 202: `{ "id", "filename", "status": "processing" }`. 404 if not found or owned by another org.
 
 ### DELETE /api/admin/documents/{id}
-Response 204. Error 404 if not found **or owned by another org** (no difference revealed).
+Response 204: removes the row, its chunks and the stored file. Error 404 `"Document not found."` if not found, malformed id, **or owned by another org** (no difference revealed).
 
 ### GET /api/admin/assistant
 Response 200: `{ "url": "https://host/a/<token-prefix>…", "embed_code": "<iframe …>", "created_at" }`

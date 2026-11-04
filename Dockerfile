@@ -7,14 +7,17 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Dependencies first for layer caching. From task 02 on, torch is installed from the CPU-only
-# index here to avoid multi-GB CUDA wheels.
+# CPU-only torch first (avoids multi-GB CUDA wheels), then the app's dependencies.
+RUN pip install torch --index-url https://download.pytorch.org/whl/cpu
 COPY pyproject.toml ./
 COPY app ./app
 RUN pip install .
 
+# Model weights are downloaded on first start into a named volume (see docker-compose.yml).
+ENV HF_HOME=/app/.cache/huggingface
+
 RUN useradd --create-home --uid 10001 appuser \
-    && mkdir -p /app/storage /app/models \
+    && mkdir -p /app/storage /app/models /app/.cache/huggingface \
     && chown -R appuser:appuser /app
 USER appuser
 
