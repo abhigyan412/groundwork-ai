@@ -10,7 +10,7 @@ Scripted mode: tests pass plans/answers keyed by question. Unscripted:
 import re
 from dataclasses import dataclass, field
 
-from app.engine.excerpt import best_excerpt
+from app.engine.excerpt import sentences, truncate
 from app.engine.spec import ComparisonPlan, DecisionPlan, ExtractedValues
 from app.llm.base import ComposeInput, LLMOutputError, LLMUnavailableError, PromptChunk
 
@@ -82,4 +82,22 @@ def extractive_answer(data: ComposeInput) -> str:
         steps = [ln for ln in data.chunks[0].text.splitlines() if _STEP.match(ln)]
         if steps:
             return "\n".join(steps)
-    return best_excerpt(data.chunks[0].text, data.question, 400)
+    return _most_relevant_sentence(data.chunks[0].text, data.question)
+
+
+_STOP = frozenset(
+    "a an and are as at be by can do does for from how i in is it of on or the to what when "
+    "where which who why with you your".split()
+)
+
+
+def _most_relevant_sentence(text: str, question: str) -> str:
+    """The sentence sharing the most content words with the question (ties: the first).
+
+    Counting shared words, not Jaccard: Jaccard (right for anchoring a rule, app/engine/excerpt.py)
+    favours short lines such as page titles when picking an answer.
+    """
+    words = lambda t: {w for w in re.findall(r"[a-z0-9:]+", t.lower()) if w not in _STOP}  # noqa: E731
+    q = words(question)
+    candidates = sentences(text) or [text.strip()]
+    return truncate(max(candidates, key=lambda c: len(q & words(c))), 400)

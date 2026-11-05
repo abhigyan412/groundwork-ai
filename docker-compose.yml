@@ -38,7 +38,15 @@ services:
       retries: 5
       start_period: 120s  # first start downloads model weights
 
-  # `web` (nginx serving the React build and proxying /api and /auth) is added in task 06.
+  web:
+    # nginx: serves the React build and proxies /api, /auth and /health to the api service, so
+    # the browser sees one origin. Only /a/* (the widget) may be framed (frontend/nginx.conf).
+    build: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
 
 volumes:
   pgdata:

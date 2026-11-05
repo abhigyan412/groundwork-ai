@@ -1,0 +1,1506 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Groundwork API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Register",
+        "operationId": "register",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisterResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "409": {
+            "description": "Email exists"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Login",
+        "operationId": "login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/me": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Me",
+        "operationId": "me",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid admin token"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/admin/documents": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "List Documents",
+        "operationId": "list_documents",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Upload Document",
+        "operationId": "upload_document",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_document"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a valid PDF, password-protected, or too many pages"
+          },
+          "409": {
+            "description": "Document limit reached"
+          },
+          "413": {
+            "description": "PDF exceeds the size limit"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/admin/documents/{document_id}": {
+      "put": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Replace Document",
+        "description": "Swap the file behind an existing document. Keeps its slot, so it works at 10/10.",
+        "operationId": "replace_document",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_replace_document"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a valid PDF, password-protected, or too many pages"
+          },
+          "409": {
+            "description": "Document limit reached"
+          },
+          "413": {
+            "description": "PDF exceeds the size limit"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Delete Document",
+        "operationId": "delete_document",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Not found (or owned by another organization)"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/assistant": {
+      "get": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "Get Assistant",
+        "description": "The org's assistant link and embed code. The first call creates the assistant.",
+        "operationId": "get_assistant",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantLink"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid admin token"
+          },
+          "409": {
+            "description": "Stored link can't be decrypted; reset it"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/admin/assistant/regenerate": {
+      "post": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "Regenerate Assistant",
+        "description": "Revoke the current link immediately and create a new one.",
+        "operationId": "regenerate_assistant",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegeneratedAssistant"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid admin token"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/admin/usage": {
+      "get": {
+        "tags": [
+          "usage"
+        ],
+        "summary": "Get Usage",
+        "operationId": "get_usage",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Usage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid admin token"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/admin/questions": {
+      "get": {
+        "tags": [
+          "usage"
+        ],
+        "summary": "List Questions",
+        "description": "Recent questions with their stored evidence trail, newest first.",
+        "operationId": "list_questions",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid admin token"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/assistant/{token}": {
+      "get": {
+        "tags": [
+          "public"
+        ],
+        "summary": "Public Assistant",
+        "description": "Org name and up to 3 suggested questions, built from section headings in the org's\ndocuments and kept only if they clear the groundedness gate (app/assistant/suggestions.py).",
+        "operationId": "public_assistant",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicAssistant"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "This assistant link is invalid or has been reset"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ask": {
+      "post": {
+        "tags": [
+          "public"
+        ],
+        "summary": "Ask",
+        "operationId": "ask",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AskResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Please enter a question"
+          },
+          "401": {
+            "description": "This assistant link is invalid or has been reset"
+          },
+          "429": {
+            "description": "Too many questions for this assistant right now"
+          },
+          "503": {
+            "description": "Couldn't generate an answer, please try again"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "ops"
+        ],
+        "summary": "Health",
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AskRequest": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token",
+            "description": "Assistant token from the widget URL"
+          },
+          "question": {
+            "type": "string",
+            "maxLength": 10000,
+            "title": "Question"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "question"
+        ],
+        "title": "AskRequest"
+      },
+      "AskResult": {
+        "properties": {
+          "answer": {
+            "type": "string",
+            "title": "Answer"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "answered",
+              "unanswered",
+              "needs_info",
+              "review"
+            ],
+            "title": "Outcome"
+          },
+          "references": {
+            "items": {
+              "$ref": "#/components/schemas/Reference"
+            },
+            "type": "array",
+            "title": "References"
+          },
+          "route": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "direct",
+                  "procedural",
+                  "policy",
+                  "decision",
+                  "comparison"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route"
+          },
+          "verdicts": {
+            "items": {
+              "$ref": "#/components/schemas/Verdict"
+            },
+            "type": "array",
+            "title": "Verdicts"
+          },
+          "timings_ms": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "type": "object"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Timings Ms"
+          },
+          "overall": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "TRUE",
+                  "FALSE",
+                  "UNKNOWN"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overall",
+            "description": "Combined result for decision/policy/comparison paths"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence",
+            "description": "Min confidence of the deciding verdicts (decision path)"
+          },
+          "answer_source": {
+            "type": "string",
+            "enum": [
+              "llm",
+              "template",
+              "none"
+            ],
+            "title": "Answer Source",
+            "default": "llm"
+          }
+        },
+        "type": "object",
+        "required": [
+          "answer",
+          "outcome",
+          "references",
+          "route",
+          "verdicts",
+          "timings_ms"
+        ],
+        "title": "AskResult"
+      },
+      "AssistantLink": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "embed_code": {
+            "type": "string",
+            "title": "Embed Code"
+          },
+          "token_prefix": {
+            "type": "string",
+            "title": "Token Prefix"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "embed_code",
+          "token_prefix",
+          "created_at"
+        ],
+        "title": "AssistantLink"
+      },
+      "Body_replace_document": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "description": "PDF, up to 20 pages and 10 MB"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_replace_document"
+      },
+      "Body_upload_document": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "description": "PDF, up to 20 pages and 10 MB"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_document"
+      },
+      "DocumentList": {
+        "properties": {
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentOut"
+            },
+            "type": "array",
+            "title": "Documents"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/Limits"
+          }
+        },
+        "type": "object",
+        "required": [
+          "documents",
+          "limits"
+        ],
+        "title": "DocumentList"
+      },
+      "DocumentOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "page_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Count"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "processing",
+              "ready",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "pages_without_text": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Pages Without Text"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "filename",
+          "page_count",
+          "size_bytes",
+          "status",
+          "error",
+          "pages_without_text",
+          "created_at"
+        ],
+        "title": "DocumentOut"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded"
+            ],
+            "title": "Status"
+          },
+          "db": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "unavailable"
+            ],
+            "title": "Db"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "db"
+        ],
+        "title": "HealthResponse"
+      },
+      "Limits": {
+        "properties": {
+          "documents_used": {
+            "type": "integer",
+            "title": "Documents Used"
+          },
+          "documents_max": {
+            "type": "integer",
+            "title": "Documents Max"
+          },
+          "max_pages": {
+            "type": "integer",
+            "title": "Max Pages"
+          },
+          "max_mb": {
+            "type": "integer",
+            "title": "Max Mb"
+          }
+        },
+        "type": "object",
+        "required": [
+          "documents_used",
+          "documents_max",
+          "max_pages",
+          "max_mb"
+        ],
+        "title": "Limits"
+      },
+      "LoginRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "LoginRequest"
+      },
+      "LoginResponse": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token",
+            "description": "Admin JWT for the dashboard"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "LoginResponse"
+      },
+      "MeResponse": {
+        "properties": {
+          "org": {
+            "$ref": "#/components/schemas/OrgOut"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "org",
+          "email"
+        ],
+        "title": "MeResponse"
+      },
+      "OrgOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "OrgOut"
+      },
+      "PublicAssistant": {
+        "properties": {
+          "org_name": {
+            "type": "string",
+            "title": "Org Name"
+          },
+          "suggested_questions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Suggested Questions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "org_name",
+          "suggested_questions"
+        ],
+        "title": "PublicAssistant"
+      },
+      "QuestionList": {
+        "properties": {
+          "questions": {
+            "items": {
+              "$ref": "#/components/schemas/QuestionOut"
+            },
+            "type": "array",
+            "title": "Questions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "questions"
+        ],
+        "title": "QuestionList"
+      },
+      "QuestionOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "question": {
+            "type": "string",
+            "title": "Question"
+          },
+          "route": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "direct",
+                  "procedural",
+                  "policy",
+                  "decision",
+                  "comparison"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "answered",
+              "unanswered",
+              "needs_info",
+              "review"
+            ],
+            "title": "Outcome"
+          },
+          "overall": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "TRUE",
+                  "FALSE",
+                  "UNKNOWN"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overall"
+          },
+          "answer": {
+            "type": "string",
+            "title": "Answer"
+          },
+          "verdicts": {
+            "items": {
+              "$ref": "#/components/schemas/Verdict"
+            },
+            "type": "array",
+            "title": "Verdicts"
+          },
+          "references": {
+            "items": {
+              "$ref": "#/components/schemas/Reference"
+            },
+            "type": "array",
+            "title": "References"
+          },
+          "timings_ms": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Timings Ms"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "question",
+          "route",
+          "outcome",
+          "overall",
+          "answer",
+          "verdicts",
+          "references",
+          "timings_ms",
+          "created_at"
+        ],
+        "title": "QuestionOut"
+      },
+      "Reference": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "title": "File"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "page"
+        ],
+        "title": "Reference"
+      },
+      "RegeneratedAssistant": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "embed_code": {
+            "type": "string",
+            "title": "Embed Code"
+          },
+          "token_prefix": {
+            "type": "string",
+            "title": "Token Prefix"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "embed_code",
+          "token_prefix",
+          "created_at",
+          "token"
+        ],
+        "title": "RegeneratedAssistant"
+      },
+      "RegisterRequest": {
+        "properties": {
+          "org_name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Org Name"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "org_name",
+          "email",
+          "password"
+        ],
+        "title": "RegisterRequest"
+      },
+      "RegisterResponse": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token",
+            "description": "Admin JWT for the dashboard"
+          },
+          "org": {
+            "$ref": "#/components/schemas/OrgOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "org"
+        ],
+        "title": "RegisterResponse"
+      },
+      "Source": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "title": "File"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "excerpt": {
+            "type": "string",
+            "title": "Excerpt",
+            "description": "Cut from the cited chunk by code, never written by the LLM"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "page",
+          "excerpt"
+        ],
+        "title": "Source"
+      },
+      "UploadAccepted": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "status": {
+            "type": "string",
+            "const": "processing",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "filename",
+          "status"
+        ],
+        "title": "UploadAccepted"
+      },
+      "Usage": {
+        "properties": {
+          "asked": {
+            "type": "integer",
+            "title": "Asked"
+          },
+          "answered": {
+            "type": "integer",
+            "title": "Answered"
+          },
+          "unanswered": {
+            "type": "integer",
+            "title": "Unanswered"
+          },
+          "needs_info": {
+            "type": "integer",
+            "title": "Needs Info"
+          },
+          "review": {
+            "type": "integer",
+            "title": "Review"
+          }
+        },
+        "type": "object",
+        "required": [
+          "asked",
+          "answered",
+          "unanswered",
+          "needs_info",
+          "review"
+        ],
+        "title": "Usage"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "Verdict": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "fact",
+              "nli",
+              "policy",
+              "choice",
+              "score"
+            ],
+            "title": "Kind"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Short plain-language condition shown in the evidence trail"
+          },
+          "rule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule"
+          },
+          "value": {
+            "type": "string",
+            "enum": [
+              "TRUE",
+              "FALSE",
+              "UNKNOWN"
+            ],
+            "title": "Value"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "user_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Value"
+          },
+          "missing_fact": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Missing Fact",
+            "description": "Set when UNKNOWN for lack of a fact"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Source"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why UNKNOWN (model error, timeout, \u2026)"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail",
+            "description": "Extra display text, e.g. 'INR 32,000'"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "label",
+          "value",
+          "confidence"
+        ],
+        "title": "Verdict"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "description": "Admin JWT from /auth/login",
+        "scheme": "bearer"
+      }
+    }
+  }
+}

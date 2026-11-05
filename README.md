@@ -30,6 +30,27 @@ The LLM is used only to break questions into checkable conditions and to write t
 
 Put the key in `LLM_API_KEY` (or the SDK's own `GEMINI_API_KEY` / `ANTHROPIC_API_KEY`). `.env` is git-ignored; never commit it.
 
+## Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev          # http://localhost:5173, proxies /api and /auth to the API on :8000
+npm run build        # strict type-check + production build
+```
+
+After changing an API route or model, regenerate the types: `python scripts/export_openapi.py` (repo root), then `npm run gen:api` (in `frontend/`).
+
+With Docker, `docker compose up -d --build` also starts `web` (nginx) on http://localhost:8080. It serves the app and proxies the API. Only `/a/*` (the widget) can be framed; every other page sends `frame-ancestors 'none'`.
+
+**Demo pages** (`demo/`) embed the widget from another origin:
+
+```bash
+python -m http.server 8090 -d demo
+# http://localhost:8090/university.html?assistant=<assistant link from the Assistant page>
+# company.html (iframe embed), js-embed.html (chat-button embed)
+```
+
 ## Develop and test
 
 ```bash

@@ -24,8 +24,8 @@ Everything visual should support one idea: **every answer shows its evidence.**
 
 | Concern | Choice |
 |---|---|
-| Build | Vite + React 18 + TypeScript |
-| Styling | Tailwind CSS with the tokens in §4 (no default Tailwind palette in components) |
+| Build | Vite 8 + React 19 + TypeScript 5.9 (strict). TypeScript 7's native compiler drops the JS API that `openapi-typescript` needs. |
+| Styling | Tailwind CSS 4: the §4 tokens live in `src/styles/index.css` `@theme`, with `--color-*: initial`, so Tailwind's default palette doesn't exist and can't be used by mistake |
 | Components | shadcn/ui primitives (Dialog, DropdownMenu, Tooltip, Tabs, Toast via sonner), restyled with our tokens |
 | Routing | React Router |
 | Server state | TanStack Query (polling for document status) |
@@ -273,7 +273,7 @@ Rules:
 ```
 
 - Works from 320 px wide; fills the iframe.
-- Suggested questions are generic per org for the MVP (configurable later).
+- Suggested questions are built from the numbered section headings in the org's documents ("What does the Hostel Policy say about curfew?"). Each one is offered only if it passes the strict groundedness gate, because a suggestion the assistant then refuses is worse than none. They're cached per org until its documents change (`app/assistant/suggestions.py`).
 - Answer states:
   - **Answered:** answer + references + collapsed evidence trail.
   - **Needs info:** answer ends with the specific question ("What's your current GPA?") and the input gets focus.
@@ -345,11 +345,18 @@ frontend/
       evidence-trail/
       ui/           # restyled shadcn primitives
     lib/            # api.ts, auth, query client, generated types
-    styles/         # tokens, tailwind config
+    styles/         # tokens (Tailwind @theme)
+  public/embed.js   # optional JS embed: floating chat button that opens the widget iframe
+  openapi.json      # exported by `python scripts/export_openapi.py` (repo root)
   index.html
-  vite.config.ts    # dev proxy /api and /auth → backend
+  vite.config.ts    # dev proxy /api, /auth, /health → backend
+  nginx.conf        # serving, API proxy, framing headers
+  Dockerfile        # node build → nginx
 ```
 
+- **API types:** run `python scripts/export_openapi.py` (repo root), then `npm run gen:api`. Both outputs (`openapi.json`, `src/lib/api-schema.d.ts`) are committed, so the Docker build needs no Python.
+- **Bundles:** every page group is lazy-loaded. The widget chunk imports only the public API client, the evidence trail and UI primitives (verified in the build output). Dialog and DropdownMenu stay out of the shared entry; the tooltip lives in its own module.
 - **Dev:** Vite proxies `/api` and `/auth` to FastAPI, so no CORS setup is needed.
+- **JS embed (optional; the iframe is primary):** `<script src="https://host/embed.js" data-assistant="https://host/a/<token>" async></script>` adds a floating button that opens the widget. Optional attributes are `data-label` and `data-position="left"`. It renders in a Shadow DOM, and the iframe loads on first open. The Assistant page shows this snippet under the iframe code.
 - **Docker:** a `web` service (nginx) serves the built app and proxies `/api` and `/auth` to the backend, so frontend and API share one origin.
 - **Framing headers (nginx):** `/a/*` allows framing by any site (`Content-Security-Policy: frame-ancestors *`); every other route denies it (`frame-ancestors 'none'`), so the dashboard can't be embedded.

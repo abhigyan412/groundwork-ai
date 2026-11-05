@@ -70,6 +70,7 @@ Indexes: `(org_id)`, `(document_id)`, HNSW (`vector_cosine_ops`) on `embedding`,
 | question | text | |
 | route | text null | direct / procedural / policy / decision / comparison; null when stopped at the groundedness gate |
 | outcome | text | answered / unanswered / needs_info / review |
+| overall | text null | combined result TRUE / FALSE / UNKNOWN on the decision, policy and comparison paths |
 | answer | text | final answer shown to the visitor |
 | verdicts | jsonb | evidence trail for the usage panel |
 | references | jsonb | `[{file, page}]` (column name is quoted in SQL: reserved word) |

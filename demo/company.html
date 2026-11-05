@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Northwind Technologies · People hub (demo)</title>
+  <style>
+    :root { --brand: #4b2fbf; --bg: #fafafa; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "Segoe UI", system-ui, sans-serif; color: #1b1b1f; background: var(--bg); }
+    header { display: flex; align-items: center; gap: 12px; padding: 16px 28px; border-bottom: 1px solid #e6e6ea; background: #fff; }
+    .logo { width: 28px; height: 28px; border-radius: 7px; background: var(--brand); }
+    header strong { font-size: 18px; }
+    main { max-width: 1100px; margin: 0 auto; padding: 36px 28px; display: grid; gap: 36px; grid-template-columns: 1fr 400px; align-items: start; }
+    h1 { font-size: 28px; margin: 0 0 10px; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 20px; }
+    .card { background: #fff; border: 1px solid #e6e6ea; border-radius: 10px; padding: 14px; font-size: 14px; }
+    .card b { display: block; margin-bottom: 4px; }
+    .note { font-size: 13px; color: #666; margin-top: 24px; }
+    .missing { background: #fff; border: 1px solid #ccc; padding: 16px; border-radius: 8px; }
+    iframe { width: 100%; height: 600px; border: 1px solid #e6e6ea; border-radius: 12px; background: #fff; }
+    @media (max-width: 880px) { main { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header><span class="logo" aria-hidden="true"></span><strong>Northwind People Hub</strong></header>
+  <main>
+    <section>
+      <h1>Ask HR</h1>
+      <p>Get answers about leave, travel and working from home, straight from our policies, with the page each
+        answer comes from.</p>
+      <div class="cards">
+        <div class="card"><b>Leave</b>Casual, sick and earned leave; carry-forward rules.</div>
+        <div class="card"><b>Travel</b>Hotel caps, approvals and how to claim expenses.</div>
+        <div class="card"><b>Work from home</b>Who's eligible and how many days a week.</div>
+      </div>
+      <p class="note">Demo page for a fictional company. The assistant is embedded with the iframe code from the
+        dashboard's Assistant page.</p>
+    </section>
+    <aside id="assistant"></aside>
+  </main>
+  <script>
+    (function () {
+      var url = new URLSearchParams(location.search).get("assistant");
+      var slot = document.getElementById("assistant");
+      if (!url || !/^https?:\/\/[^\s]+\/a\/[\w-]+$/.test(url)) {
+        slot.innerHTML = '<div class="missing"><strong>No assistant link.</strong><p>Open this page as ' +
+          '<code>company.html?assistant=&lt;assistant link&gt;</code>, using the link from the ' +
+          "dashboard's Assistant page.</p></div>";
+        return;
+      }
+      var frame = document.createElement("iframe");
+      frame.src = url;
+      frame.title = "Northwind Technologies assistant";
+      frame.loading = "lazy";
+      slot.appendChild(frame);
+    })();
+  </script>
+</body>
+</html>

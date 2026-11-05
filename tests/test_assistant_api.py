@@ -9,7 +9,6 @@ from cryptography.fernet import Fernet
 from app.assistant.tokens import hash_token
 from app.config import get_settings
 from app.llm.fake import FakeLLMClient
-from app.public.routes import suggested_from_filenames
 from tests.conftest import Account
 from tests.pdfs import make_pdf
 
@@ -99,15 +98,36 @@ async def test_each_org_has_its_own_link(client, org_a, org_b):
 # --- Public assistant info -----------------------------------------------------------------------
 
 
-async def test_public_assistant_shows_org_name_and_suggestions(client, app, org_a):
-    await upload(client, app, org_a, HOSTEL, "Hostel_Policy.pdf")
+# One text block per page in test PDFs, and block extraction joins a block into one line, so
+# each heading gets its own page to stay a line of its own (as in the real sample PDFs).
+HEADED = [
+    "1. Curfew",
+    "Hostel curfew is 22:00 on weekdays.",
+    "2. Guest rules",
+    "Guests may visit the lounge until 20:00.",
+    "3. Purpose",
+]
+
+
+class _GateStub:
+    """Reranker stub: only the curfew question is relevant, so only it may be suggested."""
+
+    def score(self, query, passages):
+        return [5.0 if "curfew" in query.lower() else -8.0 for _ in passages]
+
+
+async def test_public_assistant_offers_only_suggestions_that_pass_the_gate(client, app, org_a):
+    await upload(client, app, org_a, HEADED, "Hostel_Policy.pdf")
+    app.state.engine = replace(app.state.engine, reranker=_GateStub())
     token = token_of((await link(client, org_a))["url"])
     r = await client.get(f"/api/public/assistant/{token}")
     assert r.status_code == 200
     assert r.json() == {
         "org_name": "Riverside University",
-        "suggested_questions": ["What does the Hostel Policy document cover?"],
+        "suggested_questions": ["What does the Hostel Policy say about curfew?"],
     }
+    # Cached per org until its ready documents change.
+    assert list(app.state.suggestion_cache.entries) == [UUID(org_a.org_id)]
 
 
 @pytest.mark.parametrize("token", ["not-a-token", "x" * 43])
@@ -116,12 +136,21 @@ async def test_public_assistant_unknown_token_is_401(client, token):
     assert r.status_code == 401
 
 
-def test_suggested_questions_from_filenames():
-    files = ["Scholarship_Rules.pdf", "hostel-policy.PDF", "x.pdf", "Exam.pdf"]
-    assert suggested_from_filenames(files, 3) == [
-        "What does the Scholarship Rules document cover?",
-        "What does the hostel policy document cover?",
-        "What does the x document cover?",
+def test_candidate_questions_from_headings():
+    from app.assistant.suggestions import candidate_questions
+
+    docs = [
+        ("Hostel_Policy.pdf", ["Title\n1. Curfew\ntext", "2. Accommodation fees\n3. Purpose"]),
+        ("WFH_Policy.pdf", ["1. Eligibility\n2.1 WFH limits\n1. Eligibility"]),
+        ("Scholarship_Rules.pdf", ["2. Eligibility conditions"]),
+    ]
+    # Round-robin across documents; repeated and generic headings ("Purpose") dropped.
+    assert candidate_questions(docs) == [
+        "What does the Hostel Policy say about curfew?",
+        "What does the WFH Policy say about eligibility?",
+        "What do the Scholarship Rules say about eligibility conditions?",  # plural title: do
+        "What does the Hostel Policy say about accommodation fees?",
+        "What does the WFH Policy say about WFH limits?",
     ]
 
 

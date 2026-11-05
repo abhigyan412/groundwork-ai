@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Northwind Technologies · Careers (JS embed demo)</title>
+  <style>
+    body { margin: 0; font-family: "Segoe UI", system-ui, sans-serif; color: #1b1b1f; background: #fafafa; }
+    header { padding: 16px 28px; border-bottom: 1px solid #e6e6ea; background: #fff; font-weight: 600; }
+    main { max-width: 720px; margin: 0 auto; padding: 40px 28px; line-height: 1.6; }
+    .missing { background: #fff; border: 1px solid #ccc; padding: 16px; border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <header>Northwind Technologies · Careers</header>
+  <main>
+    <h1>Life at Northwind</h1>
+    <p>Questions about leave, travel or working from home? Use the chat button in the corner.</p>
+    <p style="font-size:13px;color:#666">Demo of the optional JS embed: one script tag adds a floating chat button
+      that opens the assistant. The iframe embed is the primary option.</p>
+    <div id="msg"></div>
+  </main>
+  <script>
+    // Equivalent to pasting:
+    // <script src="http://localhost:8080/embed.js" data-assistant="<assistant link>" async><\/script>
+    // (the "<\/" escape matters: a literal closing script tag here would end this script element)
+    (function () {
+      var url = new URLSearchParams(location.search).get("assistant");
+      if (!url || !/^https?:\/\/[^\s]+\/a\/[\w-]+$/.test(url)) {
+        document.getElementById("msg").innerHTML = '<div class="missing"><strong>No assistant link.</strong>' +
+          '<p>Open this page as <code>js-embed.html?assistant=&lt;assistant link&gt;</code>.</p></div>';
+        return;
+      }
+      var s = document.createElement("script");
+      s.src = new URL(url).origin + "/embed.js";
+      s.async = true;
+      s.setAttribute("data-assistant", url);
+      s.setAttribute("data-label", "Ask HR");
+      document.body.appendChild(s);
+    })();
+  </script>
+</body>
+</html>

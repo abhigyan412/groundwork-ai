@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Riverside University · Student support (demo)</title>
+  <style>
+    :root { --navy: #1d2b53; --sand: #f4efe6; --ink: #222; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Georgia, "Times New Roman", serif; color: var(--ink); background: var(--sand); }
+    header { background: var(--navy); color: #fff; padding: 18px 24px; }
+    header strong { font-size: 20px; letter-spacing: .3px; }
+    header nav { margin-top: 6px; font-family: system-ui, sans-serif; font-size: 14px; opacity: .85; }
+    main { max-width: 1080px; margin: 0 auto; padding: 32px 24px; display: grid; gap: 32px; grid-template-columns: 1fr 400px; align-items: start; }
+    h1 { font-size: 30px; margin: 0 0 12px; }
+    p, li { font-family: system-ui, sans-serif; line-height: 1.6; }
+    .note { font-family: system-ui, sans-serif; font-size: 13px; color: #555; }
+    .missing { font-family: system-ui, sans-serif; background: #fff; border: 1px solid #ccc; padding: 16px; border-radius: 8px; }
+    iframe { width: 100%; height: 600px; border: 0; border-radius: 12px; background: #fff; box-shadow: 0 4px 18px rgba(0,0,0,.08); }
+    @media (max-width: 880px) { main { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>Riverside University</strong>
+    <nav>Admissions · Student life · Scholarships · Housing</nav>
+  </header>
+  <main>
+    <section>
+      <h1>Student support</h1>
+      <p>Questions about scholarships, hostel rules or exams? Our policy assistant answers from the university's
+        official documents and shows the page each answer comes from.</p>
+      <ul>
+        <li>Merit scholarship eligibility and how to apply</li>
+        <li>Hostel curfew, fees and guest rules</li>
+        <li>Exam attendance and re-evaluation</li>
+      </ul>
+      <p class="note">Demo page for a fictional university. The assistant on the right is embedded with the iframe
+        code from the dashboard's Assistant page.</p>
+    </section>
+    <aside id="assistant"></aside>
+  </main>
+  <script>
+    // The embed code from the dashboard is just this iframe. Here the link comes from ?assistant=…
+    // so no assistant link is ever committed to the repo.
+    (function () {
+      var url = new URLSearchParams(location.search).get("assistant");
+      var slot = document.getElementById("assistant");
+      if (!url || !/^https?:\/\/[^\s]+\/a\/[\w-]+$/.test(url)) {
+        slot.innerHTML = '<div class="missing"><strong>No assistant link.</strong><p>Open this page as ' +
+          '<code>university.html?assistant=&lt;assistant link&gt;</code>, using the link from the ' +
+          "dashboard's Assistant page.</p></div>";
+        return;
+      }
+      var frame = document.createElement("iframe");
+      frame.src = url;
+      frame.title = "Riverside University assistant";
+      frame.loading = "lazy";
+      slot.appendChild(frame);
+    })();
+  </script>
+</body>
+</html>

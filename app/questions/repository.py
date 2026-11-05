@@ -17,6 +17,7 @@ class QuestionRow:
     question: str
     route: str | None
     outcome: str
+    overall: str | None
     answer: str
     verdicts: list[dict[str, Any]]
     references: list[dict[str, Any]]
@@ -31,6 +32,7 @@ async def log_question(
     question: str,
     route: str | None,
     outcome: str,
+    overall: str | None,
     answer: str,
     verdicts: list[dict[str, Any]],
     references: list[dict[str, Any]],
@@ -40,15 +42,16 @@ async def log_question(
 ) -> UUID:
     return await conn.fetchval(
         """
-        INSERT INTO questions (org_id, question, route, outcome, answer, verdicts, "references",
-                               timings_ms, llm_usage, latency_ms)
-        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9::jsonb, $10)
+        INSERT INTO questions (org_id, question, route, outcome, overall, answer, verdicts,
+                               "references", timings_ms, llm_usage, latency_ms)
+        VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9::jsonb, $10::jsonb, $11)
         RETURNING id
         """,
         org_id,
         question,
         route,
         outcome,
+        overall,
         answer,
         json.dumps(verdicts),
         json.dumps(references),
@@ -69,7 +72,8 @@ async def usage_counts(conn: asyncpg.Connection, org_id: UUID) -> dict[str, int]
 async def recent(conn: asyncpg.Connection, org_id: UUID, limit: int) -> list[QuestionRow]:
     rows = await conn.fetch(
         """
-        SELECT id, question, route, outcome, answer, verdicts, "references", timings_ms, created_at
+        SELECT id, question, route, outcome, overall, answer, verdicts, "references", timings_ms,
+               created_at
         FROM questions WHERE org_id = $1
         ORDER BY created_at DESC, id
         LIMIT $2
@@ -83,6 +87,7 @@ async def recent(conn: asyncpg.Connection, org_id: UUID, limit: int) -> list[Que
             question=r["question"],
             route=r["route"],
             outcome=r["outcome"],
+            overall=r["overall"],
             answer=r["answer"],
             verdicts=json.loads(r["verdicts"]),
             references=json.loads(r["references"]),
@@ -91,13 +96,3 @@ async def recent(conn: asyncpg.Connection, org_id: UUID, limit: int) -> list[Que
         )
         for r in rows
     ]
-
-
-async def ready_filenames(conn: asyncpg.Connection, org_id: UUID) -> list[str]:
-    """Filenames of the org's ready documents, oldest first (for suggested questions)."""
-    rows = await conn.fetch(
-        "SELECT filename FROM documents WHERE org_id = $1 AND status = 'ready'"
-        " ORDER BY created_at, id",
-        org_id,
-    )
-    return [r["filename"] for r in rows]

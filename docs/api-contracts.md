@@ -72,7 +72,7 @@ Response 200: `{ "token", "url", "embed_code", "token_prefix", "created_at" }`. 
 Response 200: `{ "asked": int, "answered": int, "unanswered": int, "needs_info": int, "review": int }`. `asked` is the total; a question that got a 503 (LLM unavailable) is logged and counted as `review`.
 
 ### GET /api/admin/questions?limit=20
-Response 200: `{ "questions": [{ "id", "question", "route", "outcome", "answer", "verdicts", "references", "timings_ms", "created_at" }] }`
+Response 200: `{ "questions": [{ "id", "question", "route", "outcome", "overall", "answer", "verdicts", "references", "timings_ms", "created_at" }] }`
 Recent questions for the usage page, newest first, including the stored evidence trail (`verdicts` and `timings_ms` have the same shapes as in `/api/ask`). `limit` is 1–100 (400 otherwise).
 
 ## Public
@@ -80,7 +80,7 @@ Recent questions for the usage page, newest first, including the stored evidence
 The widget page itself is a React route (`/a/:token`) served by nginx; it calls the endpoints below.
 
 ### GET /api/public/assistant/{token}
-Response 200: `{ "org_name": str, "suggested_questions": [str] }`. Suggested questions are built by code from the org's ready documents (up to 3: "What does the Hostel Policy document cover?"). No LLM call.
+Response 200: `{ "org_name": str, "suggested_questions": [str] }`. Up to 3 questions are built by code from section headings in the org's ready documents ("What does the Hostel Policy say about curfew?"). Each is kept only if it passes the strict groundedness gate, and results are cached until the org's documents change. No LLM call. The list may be empty.
 Errors: 401 invalid or revoked token (widget shows "This assistant link is no longer active").
 
 ### POST /api/ask

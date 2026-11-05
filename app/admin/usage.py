@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from app.auth.deps import CurrentOrg
 from app.db.pool import get_db
-from app.engine.types import Outcome, Reference, Route, Verdict
+from app.engine.types import Outcome, Reference, Route, Verdict, VerdictValue
 from app.questions import repository as repo
 
 router = APIRouter(prefix="/api/admin", tags=["usage"])
@@ -32,6 +32,7 @@ class QuestionOut(BaseModel):
     question: str
     route: Route | None
     outcome: Outcome
+    overall: VerdictValue | None
     answer: str
     verdicts: list[Verdict]
     references: list[Reference]

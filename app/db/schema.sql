@@ -75,6 +75,7 @@ CREATE TABLE IF NOT EXISTS questions (
     -- NULL when the question was stopped at the groundedness gate (never routed).
     route        text CHECK (route IN ('direct', 'procedural', 'policy', 'decision', 'comparison')),
     outcome      text NOT NULL CHECK (outcome IN ('answered', 'unanswered', 'needs_info', 'review')),
+    overall      text CHECK (overall IN ('TRUE', 'FALSE', 'UNKNOWN')),  -- combined result, if any
     answer       text NOT NULL,
     verdicts     jsonb NOT NULL DEFAULT '[]'::jsonb,
     "references" jsonb NOT NULL DEFAULT '[]'::jsonb,  -- quoted: REFERENCES is a reserved word
@@ -83,5 +84,6 @@ CREATE TABLE IF NOT EXISTS questions (
     latency_ms   integer,
     created_at   timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS overall text CHECK (overall IN ('TRUE', 'FALSE', 'UNKNOWN'));
 ALTER TABLE questions ADD COLUMN IF NOT EXISTS llm_usage jsonb NOT NULL DEFAULT '{}'::jsonb;
 CREATE INDEX IF NOT EXISTS questions_org_created_idx ON questions (org_id, created_at DESC);

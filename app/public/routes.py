@@ -11,9 +11,9 @@ from pydantic import BaseModel, Field
 
 from app.assistant import repository as assistants
 from app.assistant.repository import TokenOwner
+from app.assistant.suggestions import SuggestionCache, suggested_questions
 from app.assistant.tokens import hash_token
 from app.config import Settings, get_settings
-from app.db.pool import get_db
 from app.engine.pipeline import AnswerUnavailableError, answer_question
 from app.engine.types import AskResult
 from app.llm.usage import UsageMeter, metered
@@ -48,33 +48,26 @@ async def _owner(conn: asyncpg.Connection, token: str) -> TokenOwner:
     return owner
 
 
-def suggested_from_filenames(filenames: list[str], limit: int) -> list[str]:
-    """'Scholarship_Rules.pdf' → 'What does the Scholarship Rules document cover?' (no LLM)."""
-    out: list[str] = []
-    for name in filenames:
-        stem = name.rsplit(".", 1)[0].replace("_", " ").replace("-", " ")
-        title = " ".join(stem.split())
-        if title:
-            out.append(f"What does the {title} document cover?")
-        if len(out) == limit:
-            break
-    return out
-
-
 @router.get(
     "/api/public/assistant/{token}",
     name="public_assistant",
     responses={401: _401},
 )
-async def public_assistant(
-    token: str, conn: Annotated[asyncpg.Connection, Depends(get_db)], settings: AppSettings
-) -> PublicAssistant:
-    owner = await _owner(conn, token)
-    files = await questions.ready_filenames(conn, owner.org_id)
-    return PublicAssistant(
-        org_name=owner.org_name,
-        suggested_questions=suggested_from_filenames(files, settings.suggested_questions_max),
+async def public_assistant(token: str, request: Request, settings: AppSettings) -> PublicAssistant:
+    """Org name and up to 3 suggested questions, built from section headings in the org's
+    documents and kept only if they clear the groundedness gate (app/assistant/suggestions.py)."""
+    pool: asyncpg.Pool = request.app.state.db_pool
+    async with pool.acquire() as conn:
+        owner = await _owner(conn, token)
+    if not hasattr(request.app.state, "suggestion_cache"):
+        request.app.state.suggestion_cache = SuggestionCache()
+    suggestions = await suggested_questions(
+        request.app.state.engine,
+        request.app.state.suggestion_cache,
+        owner.org_id,
+        settings.suggested_questions_max,
     )
+    return PublicAssistant(org_name=owner.org_name, suggested_questions=suggestions)
 
 
 class _RateLimiter:
@@ -161,6 +154,7 @@ async def ask(body: AskRequest, request: Request, settings: AppSettings) -> AskR
             question=question,
             route=result.route if result else None,
             outcome=result.outcome if result else "review",
+            overall=result.overall if result else None,
             answer=result.answer if result else "(no answer: the language model was unavailable)",
             verdicts=[v.model_dump(mode="json") for v in result.verdicts] if result else [],
             references=[r.model_dump(mode="json") for r in result.references] if result else [],

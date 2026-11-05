@@ -74,11 +74,13 @@ Last run (task 03): **18/18**. Margins: +1.98 (strict gate), +3.74 (decision gat
 
 ## UI checks (manual, before recording the demo)
 
-- [ ] Full flow without touching the API: sign up → upload → copy embed → open demo page → ask → expand evidence trail
-- [ ] Upload errors shown per file: non-PDF, > 10 MB, > 20 pages, 11th document
-- [ ] Document status moves from processing to ready without a page refresh
-- [ ] Reset link: old embed shows "This assistant link is no longer active"
-- [ ] Widget states: answered, needs info, not in documents, error with retry
-- [ ] Dashboard route cannot be loaded inside an iframe
-- [ ] Widget usable at 320 px; dashboard usable at 768 px
-- [ ] Keyboard-only: sign up, upload, copy code, ask a question
+- [x] Full flow without touching the API: sign up → upload → copy embed → open demo page → ask → expand evidence trail
+- [x] Upload errors shown per file: non-PDF, > 10 MB, > 20 pages, 11th document
+- [x] Document status moves from processing to ready without a page refresh
+- [x] Reset link: old embed shows "This assistant link is no longer active"
+- [x] Widget states: answered, needs info, not in documents, error with retry
+- [x] Dashboard route cannot be loaded inside an iframe
+- [x] Widget usable at 320 px; dashboard usable at 768 px
+- [x] Keyboard-only: sign up, upload, copy code, ask a question
+
+All checked with Playwright (headless Chromium) against nginx + the API with the real models: 25/25 (task 06 notes).
