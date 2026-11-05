@@ -114,11 +114,15 @@ export function WidgetPage() {
       if (e instanceof ApiError && e.status === 401) {
         setInactive(true);
       } else {
-        const text =
-          e instanceof ApiError && (e.status === 429 || e.status === 400)
+        // 400/429/503 carry messages the API writes for visitors ("Today's question limit has been
+        // reached", "This is taking too long right now"). Other 5xx (nginx 502/504) don't.
+        const generic = "Couldn't get an answer right now. Try again.";
+        const shown =
+          e instanceof ApiError && [400, 429, 503].includes(e.status)
             ? e.message
-            : messageOf(e, "Couldn't get an answer right now. Try again.");
-        const shown = e instanceof ApiError && e.status >= 500 ? "Couldn't get an answer right now. Try again." : text;
+            : e instanceof ApiError
+              ? generic
+              : messageOf(e, generic);
         setMessages((m) => [...m, { id: nextId.current++, role: "error", text: shown, question: q }]);
       }
     } finally {

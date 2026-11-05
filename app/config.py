@@ -87,6 +87,9 @@ class Settings(BaseSettings):
 
     # --- Assistant / public API (task 05) ---
     ask_max_question_chars: int = 1000
+    # Whole-question limit for /api/ask (all LLM calls included). Below nginx's 180 s
+    # proxy_read_timeout, so the visitor gets a clear message instead of a bare 504.
+    ask_timeout_seconds: float = 150.0
     # Per assistant token, per API process (in memory). Protects the LLM quota from one widget.
     ask_rate_limit_per_minute: int = 20
     suggested_questions_max: int = 3
@@ -108,6 +111,8 @@ class Settings(BaseSettings):
     llm_rate_limit_retries: int = 4
     llm_retry_base_seconds: float = 2.0
     llm_retry_max_wait_seconds: float = 45.0  # total sleep across retries for one call
+    # Wall-clock limit for one LLM call, attempts and retries included.
+    llm_call_deadline_seconds: float = 75.0
 
     @property
     def resolved_llm_model(self) -> str:

@@ -29,8 +29,14 @@ from app.engine.spec import (
     flatten_any_of,
 )
 from app.llm import prompts, usage
-from app.llm.base import ComposeInput, LLMOutputError, LLMUnavailableError, PromptChunk
-from app.llm.retry import with_backoff
+from app.llm.base import (
+    ComposeInput,
+    LLMOutputError,
+    LLMQuotaExhaustedError,
+    LLMUnavailableError,
+    PromptChunk,
+)
+from app.llm.retry import DeadlineExceededError, with_backoff
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -46,11 +52,28 @@ _SCHEMAS = {
 _DELAY = re.compile(r"^(\d+(?:\.\d+)?)s$")
 
 
+def is_daily_quota(exc: BaseException) -> bool:
+    """A 429 for a per-day quota (QuotaFailure quotaId like 'GenerateRequestsPerDay…'):
+    retrying within seconds can't succeed."""
+    if not isinstance(exc, errors.APIError) or exc.code != 429:
+        return False
+    details = exc.details if isinstance(exc.details, dict) else {}
+    for item in details.get("error", {}).get("details", []) or []:
+        if isinstance(item, dict) and item.get("@type", "").endswith("google.rpc.QuotaFailure"):
+            for v in item.get("violations", []) or []:
+                if "perday" in str(v.get("quotaId", "")).lower():
+                    return True
+    return False
+
+
 def retry_hint(exc: BaseException) -> tuple[bool, float | None]:
-    """Retry 429 (rate limit / quota) and 5xx; use RetryInfo.retryDelay ("17s") when present."""
+    """Retry 429 (per-minute rate limit) and 5xx; use RetryInfo.retryDelay ("17s") when present.
+    A per-day quota is not retried."""
     if not isinstance(exc, errors.APIError):
         return False, None
     if exc.code != 429 and not (500 <= (exc.code or 0) < 600):
+        return False, None
+    if is_daily_quota(exc):
         return False, None
     details = exc.details if isinstance(exc.details, dict) else {}
     for item in details.get("error", {}).get("details", []) or []:
@@ -114,11 +137,18 @@ class GeminiLLM:
                 retries=s.llm_rate_limit_retries,
                 base_seconds=s.llm_retry_base_seconds,
                 max_total_wait=s.llm_retry_max_wait_seconds,
+                deadline=s.llm_call_deadline_seconds,
             )
         except errors.APIError as exc:
+            if is_daily_quota(exc):
+                raise LLMQuotaExhaustedError("LLM daily quota exhausted") from exc
             if exc.code == 429:
                 raise LLMUnavailableError("LLM rate limited (retries exhausted)") from exc
             raise LLMUnavailableError(f"LLM error {exc.code}: {exc.message}") from exc
+        except DeadlineExceededError as exc:
+            raise LLMUnavailableError(
+                f"LLM took longer than {s.llm_call_deadline_seconds:.0f} s"
+            ) from exc
         except Exception as exc:  # network, timeout
             raise LLMUnavailableError(f"LLM unreachable: {type(exc).__name__}: {exc}") from exc
 

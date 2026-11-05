@@ -1,6 +1,7 @@
 """GeminiLLM with the SDK stubbed out: request shape, parsing, usage, error mapping, 429 backoff.
 No network (CLAUDE.md: no real API calls in tests)."""
 
+import asyncio
 import json
 from types import SimpleNamespace
 
@@ -259,3 +260,57 @@ async def test_usage_is_recorded_even_when_blocked():
     with usage.metered() as meter, pytest.raises(LLMUnavailableError):
         await llm.compose(ComposeInput("q", "direct", "answered", None, None, [], CHUNKS, "o", []))
     assert meter.calls[0].stop_reason == "SAFETY"
+
+
+# --- Deadline and daily quota (2026-11-05: gemini-3.8-flash timed out per attempt) ---------------
+
+
+def daily_quota() -> errors.ClientError:
+    return errors.ClientError(
+        429,
+        {
+            "error": {
+                "code": 429,
+                "status": "RESOURCE_EXHAUSTED",
+                "message": "per day",
+                "details": [
+                    {
+                        "@type": "type.googleapis.com/google.rpc.QuotaFailure",
+                        "violations": [
+                            {"quotaId": "GenerateRequestsPerDayPerProjectPerModel-FreeTier"}
+                        ],
+                    },
+                    {"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": "42456s"},
+                ],
+            }
+        },
+    )
+
+
+class HangingModels(StubModels):
+    async def generate_content(self, **kwargs):
+        self.requests.append(kwargs)
+        await asyncio.Event().wait()  # never returns (asyncio.sleep is patched in these tests)
+
+
+async def test_hung_provider_fails_within_the_call_deadline():
+    import time
+
+    llm, _ = client_with(response("unused"), llm_call_deadline_seconds=0.3)
+    stub = HangingModels(response("unused"))
+    llm._client = SimpleNamespace(aio=SimpleNamespace(models=stub))  # type: ignore[assignment]
+    start = time.monotonic()
+    with pytest.raises(LLMUnavailableError, match="took longer than"):
+        await llm.compose(ComposeInput("q", "direct", "answered", None, None, [], CHUNKS, "o", []))
+    assert time.monotonic() - start < 2  # bounded by the deadline, not by retries x timeouts
+    assert len(stub.requests) == 1
+
+
+async def test_daily_quota_is_not_retried_and_raises_quota_error(no_sleep):
+    from app.llm.base import LLMQuotaExhaustedError
+
+    llm, stub = client_with(daily_quota(), response("never reached"))
+    with pytest.raises(LLMQuotaExhaustedError):
+        await llm.compose(ComposeInput("q", "direct", "answered", None, None, [], CHUNKS, "o", []))
+    assert len(stub.requests) == 1 and no_sleep == []
+    assert retry_hint(daily_quota()) == (False, None)

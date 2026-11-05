@@ -1,6 +1,7 @@
 """Public API for the widget. Accepts only the assistant token (never the admin JWT); org_id comes
 from the token lookup, never from the request (CLAUDE.md)."""
 
+import asyncio
 import time
 from collections import defaultdict, deque
 from typing import Annotated
@@ -16,6 +17,7 @@ from app.assistant.tokens import hash_token
 from app.config import Settings, get_settings
 from app.engine.pipeline import AnswerUnavailableError, answer_question
 from app.engine.types import AskResult
+from app.llm.base import LLMQuotaExhaustedError
 from app.llm.usage import UsageMeter, metered
 from app.questions import repository as questions
 
@@ -25,6 +27,23 @@ AppSettings = Annotated[Settings, Depends(get_settings)]
 
 INVALID_LINK_MESSAGE = "This assistant link is invalid or has been reset"
 _401 = {"description": INVALID_LINK_MESSAGE}
+UNAVAILABLE_MESSAGE = "Couldn't generate an answer, please try again"
+QUOTA_MESSAGE = (
+    "Today's question limit for this assistant has been reached. Please try again later."
+)
+SLOW_MESSAGE = "This is taking too long right now. Please try again in a moment."
+
+
+def _caused_by_quota(exc: BaseException) -> bool:
+    """True if a daily LLM quota is behind the failure (anywhere in the cause chain)."""
+    seen: BaseException | None = exc
+    while seen is not None:
+        if isinstance(seen, LLMQuotaExhaustedError):
+            return True
+        seen = seen.__cause__ or seen.__context__
+    return False
+
+
 MAX_TOKEN_CHARS = 200  # real tokens are 43 characters (token_urlsafe(32))
 
 
@@ -111,7 +130,7 @@ def _usage_summary(meter: UsageMeter) -> dict:
         400: {"description": "Please enter a question"},
         401: _401,
         429: {"description": "Too many questions for this assistant right now"},
-        503: {"description": "Couldn't generate an answer, please try again"},
+        503: {"description": "No answer: LLM unavailable, daily limit reached, or too slow"},
     },
 )
 async def ask(body: AskRequest, request: Request, settings: AppSettings) -> AskResult:
@@ -133,18 +152,22 @@ async def ask(body: AskRequest, request: Request, settings: AppSettings) -> AskR
         )
 
     start = time.perf_counter()
-    unavailable: AnswerUnavailableError | None = None
+    failure: str | None = None  # visitor-facing message for a 503
     result: AskResult | None = None
     with metered() as meter:
         try:
-            result = await answer_question(
-                request.app.state.engine,
-                org_id=owner.org_id,
-                org_name=owner.org_name,
-                question=question,
-            )
+            # Answer before nginx's 180 s proxy timeout would turn this into a bare 504.
+            async with asyncio.timeout(settings.ask_timeout_seconds):
+                result = await answer_question(
+                    request.app.state.engine,
+                    org_id=owner.org_id,
+                    org_name=owner.org_name,
+                    question=question,
+                )
+        except TimeoutError:
+            failure = SLOW_MESSAGE
         except AnswerUnavailableError as exc:
-            unavailable = exc
+            failure = QUOTA_MESSAGE if _caused_by_quota(exc) else UNAVAILABLE_MESSAGE
     latency = round((time.perf_counter() - start) * 1000)
 
     async with pool.acquire() as conn:
@@ -155,16 +178,14 @@ async def ask(body: AskRequest, request: Request, settings: AppSettings) -> AskR
             route=result.route if result else None,
             outcome=result.outcome if result else "review",
             overall=result.overall if result else None,
-            answer=result.answer if result else "(no answer: the language model was unavailable)",
+            answer=result.answer if result else f"(no answer: {failure})",
             verdicts=[v.model_dump(mode="json") for v in result.verdicts] if result else [],
             references=[r.model_dump(mode="json") for r in result.references] if result else [],
             timings_ms=result.timings_ms if result else {},
             llm_usage=_usage_summary(meter),
             latency_ms=latency,
         )
-    if unavailable is not None:
-        raise HTTPException(
-            status_code=503, detail="Couldn't generate an answer, please try again"
-        ) from unavailable
+    if failure is not None:
+        raise HTTPException(status_code=503, detail=failure)
     assert result is not None
     return result

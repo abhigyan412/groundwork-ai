@@ -20,6 +20,10 @@ class LLMOutputError(LLMUnavailableError):
     """The LLM responded, but not with output matching the requested schema."""
 
 
+class LLMQuotaExhaustedError(LLMUnavailableError):
+    """The provider's daily (or longer) quota is used up: retrying now can't help."""
+
+
 @dataclass(frozen=True)
 class PromptChunk:
     ref: str  # "c1"

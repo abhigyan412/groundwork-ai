@@ -311,3 +311,58 @@ async def test_usage_and_recent_questions_are_per_org(client, app, org_a, org_b)
 async def test_questions_limit_is_validated(client, org_a, limit):
     r = await client.get(f"/api/admin/questions?limit={limit}", headers=org_a.headers)
     assert r.status_code == 400
+
+
+# --- 503 messages: daily limit, too slow -----------------------------------------------------------
+
+
+class _QuotaLLM(FakeLLMClient):
+    async def compose(self, data):
+        from app.llm.base import LLMQuotaExhaustedError
+
+        raise LLMQuotaExhaustedError("LLM daily quota exhausted")
+
+    async def decompose(self, *args, **kwargs):
+        from app.llm.base import LLMQuotaExhaustedError
+
+        raise LLMQuotaExhaustedError("LLM daily quota exhausted")
+
+
+class _SlowLLM(FakeLLMClient):
+    async def compose(self, data):
+        import asyncio
+
+        await asyncio.Event().wait()
+
+    async def decompose(self, *args, **kwargs):
+        import asyncio
+
+        await asyncio.Event().wait()
+
+
+async def test_daily_quota_gives_a_specific_503(client, app, org_a):
+    await upload(client, app, org_a, HOSTEL, "Hostel_Policy.pdf")
+    token = token_of((await link(client, org_a))["url"])
+    app.state.engine = replace(app.state.engine, llm=_QuotaLLM())
+    r = await ask(client, token, "What time is the hostel curfew?")
+    assert r.status_code == 503
+    assert r.json()["detail"].startswith(
+        "Today's question limit for this assistant has been reached"
+    )
+
+
+async def test_slow_answer_gives_a_clear_503_before_the_proxy_timeout(client, app, db, org_a):
+    await upload(client, app, org_a, HOSTEL, "Hostel_Policy.pdf")
+    token = token_of((await link(client, org_a))["url"])
+    app.state.engine = replace(app.state.engine, llm=_SlowLLM())
+    app.dependency_overrides[get_settings] = lambda: get_settings().model_copy(
+        update={"ask_timeout_seconds": 0.5}
+    )
+    try:
+        r = await ask(client, token, "What time is the hostel curfew?")
+    finally:
+        app.dependency_overrides.clear()
+    assert r.status_code == 503
+    assert r.json()["detail"] == "This is taking too long right now. Please try again in a moment."
+    logged = await db.fetchval("SELECT answer FROM questions WHERE org_id = $1", UUID(org_a.org_id))
+    assert logged.startswith("(no answer: This is taking too long")

@@ -7,11 +7,21 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# CPU-only torch first (avoids multi-GB CUDA wheels), then the app's dependencies.
+# Slow or flaky networks: retry downloads instead of failing the build.
+ENV PIP_DEFAULT_TIMEOUT=120 \
+    PIP_RETRIES=10
+
+# CPU-only torch first (avoids multi-GB CUDA wheels).
 RUN pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+# Dependencies from pyproject.toml *before* copying the code, so a code change reuses this
+# cached layer instead of re-downloading every package.
 COPY pyproject.toml ./
+RUN python -c "import tomllib; print('\n'.join(tomllib.load(open('pyproject.toml','rb'))['project']['dependencies']))" > /tmp/requirements.txt \
+    && pip install -r /tmp/requirements.txt
+
 COPY app ./app
-RUN pip install .
+RUN pip install --no-deps .
 
 # Labelled questions: the question classifier is trained from these on first start.
 COPY sample_data/classifier_examples.json ./sample_data/classifier_examples.json
