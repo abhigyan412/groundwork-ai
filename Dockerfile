@@ -13,6 +13,9 @@ COPY pyproject.toml ./
 COPY app ./app
 RUN pip install .
 
+# Labelled questions: the question classifier is trained from these on first start.
+COPY sample_data/classifier_examples.json ./sample_data/classifier_examples.json
+
 # Model weights are downloaded on first start into a named volume (see docker-compose.yml).
 ENV HF_HOME=/app/.cache/huggingface
 

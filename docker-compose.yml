@@ -36,7 +36,9 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
-      start_period: 120s  # first start downloads model weights
+      # First start downloads ~700 MB of model weights into the hf-cache volume; on a slow
+      # connection that takes minutes. Later starts load from the cache in ~20 s.
+      start_period: 600s
 
   web:
     # nginx: serves the React build and proxies /api, /auth and /health to the api service, so
