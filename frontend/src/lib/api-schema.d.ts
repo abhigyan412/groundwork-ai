@@ -83,7 +83,8 @@ export interface paths {
         get?: never;
         /**
          * Replace Document
-         * @description Swap the file behind an existing document. Keeps its slot, so it works at 10/10.
+         * @description Swap the file behind an existing document. Keeps its slot, so it works at 10/10 (except
+         *     when replacing a failed document at the limit: 409).
          */
         put: operations["replace_document"];
         post?: never;
@@ -1102,7 +1103,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Couldn't generate an answer, please try again */
+            /** @description No answer: LLM unavailable, daily limit reached, or too slow */
             503: {
                 headers: {
                     [name: string]: unknown;

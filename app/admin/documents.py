@@ -156,7 +156,8 @@ async def replace_document(
     settings: AppSettings,
     request: Request,
 ) -> UploadAccepted:
-    """Swap the file behind an existing document. Keeps its slot, so it works at 10/10."""
+    """Swap the file behind an existing document. Keeps its slot, so it works at 10/10 (except
+    when replacing a failed document at the limit: 409)."""
     doc_id = _parse_id(document_id)
     if await repo.get_status(conn, account.org_id, doc_id) is None:
         raise _NOT_FOUND

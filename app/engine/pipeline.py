@@ -251,7 +251,8 @@ class _Run:
                 return self.unanswered()
             return await self.grounded(chunks, "decision")
         if not report.valid:
-            # Decomposition failed even after the retry: grounded answer, flagged for review.
+            # No valid plan (still invalid after the retry, or the LLM was unavailable): grounded
+            # answer, flagged for review.
             return await self.grounded(chunks, "decision", outcome="review")
 
         assert plan is not None

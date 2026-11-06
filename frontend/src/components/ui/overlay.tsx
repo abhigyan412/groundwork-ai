@@ -1,4 +1,4 @@
-// Restyled Radix primitives: Dialog (and a side Sheet), DropdownMenu, Tooltip.
+// Restyled Radix primitives: Dialog (and a side Sheet), DropdownMenu. Tooltip is in tooltip.tsx.
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import { X } from "lucide-react";

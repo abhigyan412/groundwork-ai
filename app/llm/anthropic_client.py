@@ -3,8 +3,8 @@
 - Structured outputs (`output_config.format` with a JSON schema) for the decompose step; the
   parsed JSON is then validated with Pydantic, and semantically by code (app/engine/validate.py).
 - Server-side refusal fallback (`fallbacks="default"`, beta server-side-fallback-2026-07-01).
-- Effort is set explicitly per call (Claude Opus 5.5 defaults to medium). Thinking stays on
-  (adaptive); it can't be disabled on this model.
+- Effort is set explicitly per call (the default differs by model). Thinking stays on
+  (adaptive); it can't be disabled on the supported models.
 - SDK retries handle 408/409/429/5xx and connection errors; anything left becomes
   LLMUnavailableError so the pipeline can degrade gracefully.
 """

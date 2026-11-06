@@ -3,8 +3,9 @@
 Scripted mode: tests pass plans/answers keyed by question. Unscripted:
 - decompose → no decisions (the pipeline falls through to a grounded answer)
 - decompose_comparison → raises (the pipeline falls back to the decision path)
-- compose → an extractive answer: the most relevant sentences of the top documents, so the app
-  is usable for demos of retrieval and the UI before an API key exists.
+- compose → an extractive answer: the sentence of the top chunk that best matches the question
+  (numbered steps for procedures), so the app is usable for demos of retrieval and the UI
+  before an API key exists.
 """
 
 import re
@@ -75,7 +76,7 @@ _STEP = re.compile(r"^\d+\.\s")
 
 
 def extractive_answer(data: ComposeInput) -> str:
-    """Best-matching document sentences; numbered steps kept in order for procedures."""
+    """The best-matching sentence of the top chunk; numbered steps kept in order for procedures."""
     if not data.chunks:
         return "The documents don't cover this."
     if data.route == "procedural":

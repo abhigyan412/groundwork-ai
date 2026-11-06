@@ -1,7 +1,8 @@
 """Application settings and every tunable threshold.
 
 All thresholds live here, never inline (CLAUDE.md). Values come from the environment / `.env`;
-defaults are the [Proposed] values from docs/ai-design.md §12 and docs/requirements.md.
+defaults are the values in docs/ai-design.md §14 (some tuned on the task 03/04 evals) and
+docs/requirements.md.
 """
 
 from functools import lru_cache

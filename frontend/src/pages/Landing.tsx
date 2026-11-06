@@ -1,5 +1,5 @@
 // Landing (docs/frontend.md §6.1). The example on the right is the real EvidenceTrail component
-// rendering static data from a real run (test question 5).
+// rendering hand-written example data modelled on test question 5.
 import { Link } from "react-router-dom";
 import { EvidenceTrail, type Trail } from "@/components/evidence-trail/EvidenceTrail";
 import { buttonClass } from "@/components/ui/button";

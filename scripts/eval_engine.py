@@ -4,10 +4,11 @@
     python scripts/eval_engine.py                    # LLM per LLM_PROVIDER in .env
     python scripts/eval_engine.py --runs 2 --json out.json
 
-With LLM_PROVIDER=anthropic, Claude decomposes and composes. With LLM_PROVIDER=fake, the decompose
-step uses the reference plans below (what a correct decomposition looks like, rules copied from
-the sample PDFs) so the System 1 side (classifier, gate, rule grounding, NLI, fact checks,
-comparison) can be checked before an API key exists; answers are then extractive.
+With a real provider (gemini or anthropic), the LLM decomposes and composes. With
+LLM_PROVIDER=fake, the decompose step uses the reference plans below (what a correct
+decomposition looks like, rules copied from the sample PDFs) so the System 1 side (classifier,
+gate, rule grounding, NLI, fact checks, comparison) can be checked before an API key exists;
+answers are then extractive.
 
 Like eval_retrieval.py, it registers two throwaway orgs, uploads the sample PDFs, and deletes the
 orgs at the end.
@@ -229,7 +230,7 @@ class ReferenceLLM(FakeLLMClient):
 
 
 # What each question should produce. route: the path actually taken. Verdict expectations for
-# decision questions are per *reference* decision (matched to Claude's by meaning, not by order).
+# decision questions are per *reference* decision (matched to the LLM's by meaning, not by order).
 EXPECTED = {
     1: {"route": "direct", "outcome": "answered"},
     2: {"route": "procedural", "outcome": "answered"},
@@ -348,7 +349,7 @@ class RecordingLLM:
         return await self.inner.compose(data)
 
 
-# --- Plan comparison: Claude vs reference ------------------------------------------------------
+# --- Plan comparison: LLM vs reference ---------------------------------------------------------
 
 
 def _canonical(op: str, value):
@@ -366,7 +367,7 @@ def _page_of(ref: str, plan_chunks: dict[str, str]) -> str:
 
 
 def compare_plans(qid: int, plan: DecisionPlan, refs_to_pages: dict[str, str]):
-    """Match each reference decision to Claude's by cited page + value; check fact and direction."""
+    """Match each reference decision to the LLM's by cited page + value; check fact, direction."""
     reference = REFERENCE_PLANS.get(qid)
     if reference is None:
         return [], []

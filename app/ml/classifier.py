@@ -3,8 +3,8 @@
 See docs/ai-design.md §3.
 
 Trained by scripts/train_classifier.py into a .joblib file. At startup the app loads it; if it's
-missing or was trained with a different embedding model, it retrains from the labelled examples
-(a second or two for ~75 questions) so a fresh clone works without a manual step.
+missing or was trained with a different embedding model or C, it retrains from the labelled
+examples (a second or two for ~75 questions) so a fresh clone works without a manual step.
 """
 
 import json

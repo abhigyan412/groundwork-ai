@@ -6,6 +6,8 @@
 - Thinking: Gemini 3.x models take `thinking_level`; the configured efforts map to low/medium/high.
 - Rate limits: the free tier allows a few requests per minute, so 429 and 5xx responses are
   retried with exponential backoff (app/llm/retry.py), honouring a RetryInfo delay if one is sent.
+  A per-day quota 429 is not retried (LLMQuotaExhaustedError), and each call, retries included,
+  is bounded by `llm_call_deadline_seconds`.
 - Anything left over (auth, bad request, blocked content, truncated or empty output) becomes
   LLMUnavailableError / LLMOutputError, exactly like the Anthropic client.
 """

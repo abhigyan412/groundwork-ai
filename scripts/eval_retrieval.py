@@ -9,7 +9,7 @@ orgs, uploads sample_data/{riverside,northwind}/*.pdf, asks every question, prin
 sources and reranker scores, then deletes the throwaway orgs (cascade removes their data).
 
 The gate is per route (docs/ai-design.md §2). Here the route is the question's labelled type; the
-classifier's predicted route replaces it once task 04 exists. Not-in-KB questions have no true
+classifier's predicted route is used in scripts/eval_engine.py. Not-in-KB questions have no true
 route, so they're checked against the strict gate, and the "if decision" column shows whether
 they would leak through if the classifier sent them down the decision path.
 """

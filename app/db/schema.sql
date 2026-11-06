@@ -80,7 +80,8 @@ CREATE TABLE IF NOT EXISTS questions (
     verdicts     jsonb NOT NULL DEFAULT '[]'::jsonb,
     "references" jsonb NOT NULL DEFAULT '[]'::jsonb,  -- quoted: REFERENCES is a reserved word
     timings_ms   jsonb NOT NULL DEFAULT '{}'::jsonb,
-    llm_usage    jsonb NOT NULL DEFAULT '{}'::jsonb,  -- {input_tokens, output_tokens, calls, model}
+    -- {calls, input_tokens, output_tokens, cache_read_input_tokens, models}
+    llm_usage    jsonb NOT NULL DEFAULT '{}'::jsonb,
     latency_ms   integer,
     created_at   timestamptz NOT NULL DEFAULT now()
 );

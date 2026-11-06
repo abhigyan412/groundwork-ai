@@ -210,7 +210,7 @@
           "documents"
         ],
         "summary": "Replace Document",
-        "description": "Swap the file behind an existing document. Keeps its slot, so it works at 10/10.",
+        "description": "Swap the file behind an existing document. Keeps its slot, so it works at 10/10 (except\nwhen replacing a failed document at the limit: 409).",
         "operationId": "replace_document",
         "security": [
           {
@@ -545,7 +545,7 @@
             "description": "Too many questions for this assistant right now"
           },
           "503": {
-            "description": "Couldn't generate an answer, please try again"
+            "description": "No answer: LLM unavailable, daily limit reached, or too slow"
           },
           "422": {
             "description": "Validation Error",
